@@ -71,29 +71,7 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import kotlinx.coroutines.launch
-import java.util.Locale
 import androidx.compose.foundation.Canvas
-
-// ── Formatting helpers ────────────────────────────────────────────────────────
-
-private fun formatThousands(n: Int): String = String.format(Locale.US, "%,d", n)
-
-private fun elevationM(m: Double): String = formatThousands(m.toInt())
-private fun elevationFt(m: Double): String = formatThousands((m * 3.28084).toInt())
-
-private fun formatLat(lat: Double): String {
-    val dir = if (lat >= 0) "N" else "S"
-    return "${"%.5f".format(kotlin.math.abs(lat))}° $dir"
-}
-
-private fun formatLon(lon: Double): String {
-    val dir = if (lon >= 0) "E" else "W"
-    return "${"%.5f".format(kotlin.math.abs(lon))}° $dir"
-}
-
-private fun formatAccuracy(m: Float, unitSystem: UnitSystem): String =
-    if (unitSystem == UnitSystem.METRIC) "${"%.1f".format(m)} m"
-    else "${"%.1f".format(m * 3.28084f)} ft"
 
 // ── Sub-composables ───────────────────────────────────────────────────────────
 
@@ -447,11 +425,7 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
                 colors = colors
             )
             if (gpsState.pressureHpa > 0f) {
-                val pressureValue = if (unitSystem == UnitSystem.METRIC)
-                    "${"%.1f".format(gpsState.pressureHpa)} hPa"
-                else
-                    "${"%.2f".format(gpsState.pressureHpa * 0.02953f)} inHg"
-                CoordRow(label = "PRESSURE", value = pressureValue, colors = colors)
+                CoordRow(label = "PRESSURE", value = formatPressure(gpsState.pressureHpa, unitSystem), colors = colors)
             }
 
             Spacer(modifier = Modifier.weight(1f))
