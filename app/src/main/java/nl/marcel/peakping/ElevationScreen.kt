@@ -30,7 +30,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.GpsFixed
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -247,7 +246,18 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
         }
     }
 
+    val savedPins by viewModel.savedPins.collectAsState()
     var showSettings by remember { mutableStateOf(false) }
+    var showSaved    by remember { mutableStateOf(false) }
+    var savedConfirmation by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        viewModel.saveEvent.collect {
+            savedConfirmation = true
+            kotlinx.coroutines.delay(2000)
+            savedConfirmation = false
+        }
+    }
 
     if (showSettings) {
         SettingsScreen(
@@ -257,6 +267,19 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
             onUnitSystemChange = { viewModel.setUnitSystem(it) },
             colors = colors,
             onBack = { showSettings = false }
+        )
+        return
+    }
+
+    if (showSaved) {
+        SavedLocationsScreen(
+            pins = savedPins,
+            gpsState = gpsState,
+            unitSystem = unitSystem,
+            colors = colors,
+            onSave = { viewModel.saveCurrentLocation() },
+            onDelete = { viewModel.deletePin(it) },
+            onBack = { showSaved = false }
         )
         return
     }
@@ -338,13 +361,15 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
                         fontWeight = FontWeight.Bold,
                         color = colors.text
                     )
-                    Text(
-                        text = if (gpsState.baroFused) "ELEVATION · GPS + BARO" else "ELEVATION · GPS",
-                        fontSize = 9.sp,
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.dimAccent
-                    )
+                    if (gpsState.locationName.isNotEmpty()) {
+                        Text(
+                            text = gpsState.locationName,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.SansSerif,
+                            color = colors.dimText
+                        )
+                    }
+
                 }
                 IconButton(onClick = {
                     val next = when (themeMode) {
@@ -421,7 +446,7 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
             )
             CoordRow(
                 label = "SATELLITES",
-                value = if (gpsState.locked) gpsState.satellites.toString() else "---",
+                value = if (gpsState.satellites > 0) gpsState.satellites.toString() else "---",
                 colors = colors
             )
             if (gpsState.pressureHpa > 0f) {
@@ -431,55 +456,64 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
             Spacer(modifier = Modifier.weight(1f))
 
             // ── Bottom action bar ─────────────────────────────────────────────
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = {}) {
-                    Icon(
-                        imageVector = Icons.Default.Bookmark,
-                        contentDescription = "Save",
-                        tint = colors.dimText
-                    )
-                }
-
-                // Ping FAB with pulse ring
-                Box(contentAlignment = Alignment.Center) {
-                    // Expanding pulse ring
-                    Canvas(modifier = Modifier.size(120.dp)) {
-                        val r = 32.dp.toPx() * pulseScale.value
-                        drawCircle(
-                            color = AccentGreen,
-                            radius = r,
-                            alpha = pulseAlpha.value
-                        )
-                    }
-                    // FAB button
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(CircleShape)
-                            .background(AccentGreen)
-                            .clickable { viewModel.ping() },
-                        contentAlignment = Alignment.Center
-                    ) {
+            Box(contentAlignment = Alignment.TopCenter) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 32.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { showSaved = true }) {
                         Icon(
-                            imageVector = Icons.Default.GpsFixed,
-                            contentDescription = "Ping",
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
+                            imageVector = Icons.Default.Bookmark,
+                            contentDescription = "Saved locations",
+                            tint = if (savedPins.isNotEmpty()) AccentGreen else colors.dimText
                         )
                     }
+
+                    // Ping FAB with pulse ring
+                    Box(contentAlignment = Alignment.Center) {
+                        // Expanding pulse ring
+                        Canvas(modifier = Modifier.size(120.dp)) {
+                            val r = 32.dp.toPx() * pulseScale.value
+                            drawCircle(
+                                color = AccentGreen,
+                                radius = r,
+                                alpha = pulseAlpha.value
+                            )
+                        }
+                        // FAB button
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .background(AccentGreen)
+                                .clickable { viewModel.ping() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.GpsFixed,
+                                contentDescription = "Ping",
+                                tint = Color.White,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+
+                    // Spacer to balance the bookmark on the left
+                    Spacer(modifier = Modifier.size(48.dp))
                 }
 
-                IconButton(onClick = {}) {
-                    Icon(
-                        imageVector = Icons.Default.History,
-                        contentDescription = "History",
-                        tint = colors.dimText
+                // Save confirmation
+                if (savedConfirmation) {
+                    Text(
+                        text = "Saved",
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.SansSerif,
+                        fontWeight = FontWeight.Bold,
+                        color = AccentGreen,
+                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
             }

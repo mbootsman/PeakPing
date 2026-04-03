@@ -8,6 +8,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.location.Geocoder
 import android.location.GnssStatus
 import android.location.Location
 import android.location.LocationListener
@@ -54,8 +55,57 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
         prefs.edit().putString("unit_system", system.name).apply()
     }
 
+    // ── Saved pins ────────────────────────────────────────────────────────────
+
+    private val _savedPins = MutableStateFlow(
+        pinsFromJson(prefs.getString("saved_pins", "[]") ?: "[]")
+    )
+    val savedPins: StateFlow<List<SavedPin>> = _savedPins.asStateFlow()
+
+    private val _saveEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val saveEvent: SharedFlow<Unit> = _saveEvent.asSharedFlow()
+
+    fun saveCurrentLocation() {
+        val state = _gpsState.value
+        if (!state.locked) return
+        val now = System.currentTimeMillis()
+        val pin = SavedPin(
+            id           = now,
+            label        = state.locationName.ifEmpty { formatLat(state.lat) },
+            lat          = state.lat,
+            lon          = state.lon,
+            elevationM   = state.elevation,
+            locationName = state.locationName,
+            savedAt      = now,
+        )
+        val updated = _savedPins.value + pin
+        _savedPins.value = updated
+        prefs.edit().putString("saved_pins", updated.toJson()).apply()
+        _saveEvent.tryEmit(Unit)
+    }
+
+    fun deletePin(id: Long) {
+        val updated = _savedPins.value.filter { it.id != id }
+        _savedPins.value = updated
+        prefs.edit().putString("saved_pins", updated.toJson()).apply()
+    }
+
     init {
         GeoidModel.init(application)
+    }
+
+    // ── Geocoder ──────────────────────────────────────────────────────────────
+
+    private val geocoder = Geocoder(application)
+
+    private fun updateLocationName(lat: Double, lon: Double) {
+        geocoder.getFromLocation(lat, lon, 1) { addresses ->
+            val a = addresses.firstOrNull() ?: return@getFromLocation
+            val name = listOfNotNull(a.locality, a.countryName).joinToString(", ")
+            if (name.isNotEmpty()) {
+                _gpsState.value = _gpsState.value.copy(locationName = name)
+            }
+        }
     }
 
     // ── Location ──────────────────────────────────────────────────────────────
@@ -90,6 +140,8 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
             locked = true,
             baroFused = false,   // GPS just updated — baro will take over next sensor tick
         )
+
+        updateLocationName(location.latitude, location.longitude)
     }
 
     private val gnssCallback = object : GnssStatus.Callback() {
