@@ -30,7 +30,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,17 +51,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import kotlinx.coroutines.launch
 import java.util.Locale
 import androidx.compose.foundation.Canvas
-
-private val BgColor = Color(0xFF0D0D0D)
-private val AccentGreen = Color(0xFF3A8C66)
-private val DimGreen = Color(0xFF3A8C66).copy(alpha = 0.65f)
-private val DimWhite = Color.White.copy(alpha = 0.55f)
 
 // ── Formatting helpers ────────────────────────────────────────────────────────
 
@@ -73,20 +74,22 @@ private fun elevationFt(m: Double): String = formatThousands((m * 3.28084).toInt
 
 private fun formatLat(lat: Double): String {
     val dir = if (lat >= 0) "N" else "S"
-    return "${"%.4f".format(kotlin.math.abs(lat))}° $dir"
+    return "${"%.5f".format(kotlin.math.abs(lat))}° $dir"
 }
 
 private fun formatLon(lon: Double): String {
     val dir = if (lon >= 0) "E" else "W"
-    return "${"%.4f".format(kotlin.math.abs(lon))}° $dir"
+    return "${"%.5f".format(kotlin.math.abs(lon))}° $dir"
 }
 
-private fun formatAccuracy(m: Float): String = "${"%.1f".format(m)} m"
+private fun formatAccuracy(m: Float, unitSystem: UnitSystem): String =
+    if (unitSystem == UnitSystem.METRIC) "${"%.1f".format(m)} m"
+    else "${"%.1f".format(m * 3.28084f)} ft"
 
 // ── Sub-composables ───────────────────────────────────────────────────────────
 
 @Composable
-private fun ElevationRing(gpsState: GpsState, acquiringAlpha: Float) {
+private fun ElevationRing(gpsState: GpsState, acquiringAlpha: Float, colors: AppColors, unitSystem: UnitSystem) {
     Box(
         modifier = Modifier.size(200.dp),
         contentAlignment = Alignment.Center
@@ -122,28 +125,35 @@ private fun ElevationRing(gpsState: GpsState, acquiringAlpha: Float) {
             Text(
                 text = "ELEVATION",
                 fontSize = 9.sp,
-                fontFamily = FontFamily.Monospace,
-                color = DimGreen,
-                letterSpacing = 2.sp
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Bold,
+                color = colors.dimAccent
             )
             Spacer(modifier = Modifier.height(2.dp))
 
             if (gpsState.locked) {
+                val primary  = if (unitSystem == UnitSystem.METRIC) elevationM(gpsState.elevation)
+                               else elevationFt(gpsState.elevation)
+                val subtitle = if (unitSystem == UnitSystem.METRIC)
+                    "${elevationM(gpsState.elevation)} m  ·  ${elevationFt(gpsState.elevation)} ft"
+                else
+                    "${elevationFt(gpsState.elevation)} ft  ·  ${elevationM(gpsState.elevation)} m"
+
                 Text(
-                    text = elevationM(gpsState.elevation),
+                    text = primary,
                     fontSize = 52.sp,
-                    fontFamily = FontFamily.Serif,
+                    fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Light,
-                    color = Color.White,
+                    color = colors.text,
                     lineHeight = 54.sp,
                     textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "${elevationM(gpsState.elevation)} m  ·  ${elevationFt(gpsState.elevation)} ft",
+                    text = subtitle,
                     fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = DimWhite,
+                    fontFamily = FontFamily.SansSerif,
+                    color = colors.dimText,
                     textAlign = TextAlign.Center
                 )
             } else {
@@ -161,7 +171,7 @@ private fun ElevationRing(gpsState: GpsState, acquiringAlpha: Float) {
 }
 
 @Composable
-private fun SignalBarsRow(satellites: Int) {
+private fun SignalBarsRow(satellites: Int, colors: AppColors) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
@@ -184,16 +194,16 @@ private fun SignalBarsRow(satellites: Int) {
         Spacer(modifier = Modifier.width(10.dp))
         Text(
             text = "$satellites SATELLITES",
-            fontFamily = FontFamily.Monospace,
+            fontFamily = FontFamily.SansSerif,
+            fontWeight = FontWeight.Bold,
             fontSize = 10.sp,
-            color = DimWhite,
-            letterSpacing = 1.sp
+            color = colors.dimText
         )
     }
 }
 
 @Composable
-private fun CoordRow(label: String, value: String) {
+private fun CoordRow(label: String, value: String, colors: AppColors) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -203,33 +213,17 @@ private fun CoordRow(label: String, value: String) {
     ) {
         Text(
             text = label,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = FontFamily.SansSerif,
+            fontWeight = FontWeight.Bold,
             fontSize = 11.sp,
-            color = DimGreen,
-            letterSpacing = 1.5.sp
+            color = colors.dimAccent
         )
         Text(
             text = value,
             fontFamily = FontFamily.Monospace,
             fontSize = 13.sp,
-            color = Color.White
+            color = colors.text
         )
-    }
-}
-
-@Composable
-private fun PageDots() {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        for (i in 0..2) {
-            Box(
-                modifier = Modifier
-                    .size(if (i == 0) 8.dp else 5.dp)
-                    .background(
-                        color = if (i == 0) AccentGreen else Color.White.copy(alpha = 0.25f),
-                        shape = CircleShape
-                    )
-            )
-        }
     }
 }
 
@@ -239,6 +233,29 @@ private fun PageDots() {
 @Composable
 fun ElevationScreen(viewModel: ElevationViewModel) {
     val gpsState by viewModel.gpsState.collectAsState()
+    val themeMode by viewModel.themeMode.collectAsState()
+    val unitSystem by viewModel.unitSystem.collectAsState()
+    val systemIsDark = isSystemInDarkTheme()
+    val isDark = when (themeMode) {
+        ThemeMode.SYSTEM -> systemIsDark
+        ThemeMode.DARK   -> true
+        ThemeMode.LIGHT  -> false
+    }
+    val colors = if (isDark) DarkColors else LightColors
+
+    var showSettings by remember { mutableStateOf(false) }
+
+    if (showSettings) {
+        SettingsScreen(
+            themeMode = themeMode,
+            onThemeChange = { viewModel.setThemeMode(it) },
+            unitSystem = unitSystem,
+            onUnitSystemChange = { viewModel.setUnitSystem(it) },
+            colors = colors,
+            onBack = { showSettings = false }
+        )
+        return
+    }
 
     // Permission
     val fineLocation = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -278,7 +295,7 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgColor)
+            .background(colors.bg)
     ) {
         Column(
             modifier = Modifier
@@ -299,23 +316,41 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
                     Text(
                         text = "PeakPing",
                         fontSize = 22.sp,
-                        fontFamily = FontFamily.Serif,
+                        fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = colors.text
                     )
                     Text(
                         text = "ELEVATION VIA GPS",
                         fontSize = 9.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = DimGreen,
-                        letterSpacing = 2.sp
+                        fontFamily = FontFamily.SansSerif,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.dimAccent
                     )
                 }
-                IconButton(onClick = {}) {
+                IconButton(onClick = {
+                    val next = when (themeMode) {
+                        ThemeMode.SYSTEM -> ThemeMode.DARK
+                        ThemeMode.DARK   -> ThemeMode.LIGHT
+                        ThemeMode.LIGHT  -> ThemeMode.SYSTEM
+                    }
+                    viewModel.setThemeMode(next)
+                }) {
                     Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "Menu",
-                        tint = DimWhite
+                        imageVector = when (themeMode) {
+                            ThemeMode.SYSTEM -> Icons.Default.BrightnessAuto
+                            ThemeMode.DARK   -> Icons.Default.DarkMode
+                            ThemeMode.LIGHT  -> Icons.Default.LightMode
+                        },
+                        contentDescription = "Cycle theme",
+                        tint = colors.dimText
+                    )
+                }
+                IconButton(onClick = { showSettings = true }) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Settings",
+                        tint = colors.dimText
                     )
                 }
             }
@@ -323,12 +358,12 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
             Spacer(modifier = Modifier.height(12.dp))
 
             // ── Elevation ring ────────────────────────────────────────────────
-            ElevationRing(gpsState = gpsState, acquiringAlpha = acquiringAlpha)
+            ElevationRing(gpsState = gpsState, acquiringAlpha = acquiringAlpha, colors = colors, unitSystem = unitSystem)
 
             Spacer(modifier = Modifier.height(20.dp))
 
             // ── Signal bars ───────────────────────────────────────────────────
-            SignalBarsRow(satellites = gpsState.satellites)
+            SignalBarsRow(satellites = gpsState.satellites, colors = colors)
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -342,15 +377,18 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
             // ── Coordinates panel ─────────────────────────────────────────────
             CoordRow(
                 label = "LAT",
-                value = if (gpsState.locked) formatLat(gpsState.lat) else "---"
+                value = if (gpsState.locked) formatLat(gpsState.lat) else "---",
+                colors = colors
             )
             CoordRow(
                 label = "LON",
-                value = if (gpsState.locked) formatLon(gpsState.lon) else "---"
+                value = if (gpsState.locked) formatLon(gpsState.lon) else "---",
+                colors = colors
             )
             CoordRow(
                 label = "ACCURACY",
-                value = if (gpsState.locked) formatAccuracy(gpsState.accuracyM) else "---"
+                value = if (gpsState.locked) formatAccuracy(gpsState.accuracyM, unitSystem) else "---",
+                colors = colors
             )
 
             Spacer(modifier = Modifier.weight(1f))
@@ -367,7 +405,7 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
                     Icon(
                         imageVector = Icons.Default.Bookmark,
                         contentDescription = "Save",
-                        tint = DimWhite
+                        tint = colors.dimText
                     )
                 }
 
@@ -404,17 +442,12 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
                     Icon(
                         imageVector = Icons.Default.History,
                         contentDescription = "History",
-                        tint = DimWhite
+                        tint = colors.dimText
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-
-            // ── Page indicator dots ───────────────────────────────────────────
-            PageDots()
-
-            Spacer(modifier = Modifier.height(10.dp))
 
             // ── Home bar pill ─────────────────────────────────────────────────
             Box(
@@ -422,7 +455,7 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
                     .width(120.dp)
                     .height(4.dp)
                     .background(
-                        color = Color.White.copy(alpha = 0.25f),
+                        color = colors.dimText.copy(alpha = 0.25f),
                         shape = RoundedCornerShape(2.dp)
                     )
             )

@@ -39,6 +39,24 @@ android {
     }
 }
 
+// ── EGM96 geoid asset check ───────────────────────────────────────────────────
+// egm96_1deg.bin (127 KB) provides MSL altitude correction on Android < 14.
+// Generate it once by running: python3 scripts/generate_geoid.py
+// Then commit the file so CI and other developers don't need to regenerate it.
+tasks.register("checkEgm96Asset") {
+    doLast {
+        val f = layout.projectDirectory.file("src/main/assets/egm96_1deg.bin").asFile
+        if (!f.exists()) {
+            logger.warn("⚠ EGM96 geoid asset missing — altitude will be WGS84 on Android < 14.")
+            logger.warn("  Fix: python3 scripts/generate_geoid.py")
+        }
+    }
+}
+
+afterEvaluate {
+    tasks.named("preBuild") { dependsOn("checkEgm96Asset") }
+}
+
 dependencies {
 
     implementation(libs.androidx.core.ktx)
