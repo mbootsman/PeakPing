@@ -6,7 +6,15 @@ enum class ThemeMode { SYSTEM, DARK, LIGHT }
 
 enum class UnitSystem { METRIC, IMPERIAL }
 
-val AccentGreen = Color(0xFF3A8C66)
+// Brand palette
+val Navy   = Color(0xFF0C447C)
+val Ocean  = Color(0xFF185FA5)
+val Sky    = Color(0xFF378ADD)
+val Summit = Color(0xFF00AAB3)
+val Signal = Color(0xFF9FE1CB)
+
+// Primary accent used across rings, radio buttons, dividers
+val AccentGreen = Summit
 
 data class AppColors(
     val bg: Color,
@@ -16,15 +24,15 @@ data class AppColors(
 )
 
 val DarkColors = AppColors(
-    bg = Color(0xFF0D0D0D),
+    bg = Color(0xFF080E14),          // very dark navy tint
     text = Color.White,
     dimText = Color.White.copy(alpha = 0.55f),
-    dimAccent = AccentGreen.copy(alpha = 0.65f),
+    dimAccent = Signal.copy(alpha = 0.65f),
 )
 
 val LightColors = AppColors(
-    bg = Color(0xFFF5F5F5),
-    text = Color(0xFF1A1A1A),
-    dimText = Color(0xFF1A1A1A).copy(alpha = 0.55f),
-    dimAccent = AccentGreen.copy(alpha = 0.80f),
+    bg = Color(0xFFF0F6FF),          // pale sky tint
+    text = Navy,
+    dimText = Navy.copy(alpha = 0.55f),
+    dimAccent = Ocean.copy(alpha = 0.80f),
 )

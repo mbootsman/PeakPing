@@ -7,6 +7,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -35,10 +36,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import android.app.Activity
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -90,6 +99,46 @@ private fun formatAccuracy(m: Float, unitSystem: UnitSystem): String =
 
 @Composable
 private fun ElevationRing(gpsState: GpsState, acquiringAlpha: Float, colors: AppColors, unitSystem: UnitSystem) {
+    // Staggered pulse animations — always computed, only applied when acquiring
+    val pulseTransition = rememberInfiniteTransition(label = "ringPulse")
+    val cycle = 2400
+    val dim = 0.12f
+    val ringAlpha1 by pulseTransition.animateFloat(
+        initialValue = dim, targetValue = dim,
+        animationSpec = infiniteRepeatable(keyframes {
+            durationMillis = cycle
+            dim   at 0
+            1.00f at 400
+            dim   at 800
+            dim   at cycle
+        }), label = "ra1"
+    )
+    val ringAlpha2 by pulseTransition.animateFloat(
+        initialValue = dim, targetValue = dim,
+        animationSpec = infiniteRepeatable(keyframes {
+            durationMillis = cycle
+            dim   at 0
+            dim   at 800
+            0.70f at 1200
+            dim   at 1600
+            dim   at cycle
+        }), label = "ra2"
+    )
+    val ringAlpha3 by pulseTransition.animateFloat(
+        initialValue = dim, targetValue = dim,
+        animationSpec = infiniteRepeatable(keyframes {
+            durationMillis = cycle
+            dim   at 0
+            dim   at 1600
+            0.45f at 2000
+            dim   at cycle
+        }), label = "ra3"
+    )
+
+    val a1 = if (gpsState.locked) 1.00f else ringAlpha1
+    val a2 = if (gpsState.locked) 0.45f else ringAlpha2
+    val a3 = if (gpsState.locked) 0.25f else ringAlpha3
+
     Box(
         modifier = Modifier.size(200.dp),
         contentAlignment = Alignment.Center
@@ -102,19 +151,22 @@ private fun ElevationRing(gpsState: GpsState, acquiringAlpha: Float, colors: App
                 color = AccentGreen,
                 radius = maxR,
                 center = center,
-                style = Stroke(width = 2.dp.toPx())
+                style = Stroke(width = 2.dp.toPx()),
+                alpha = a1
             )
             drawCircle(
-                color = AccentGreen.copy(alpha = 0.45f),
+                color = AccentGreen,
                 radius = maxR * 0.82f,
                 center = center,
-                style = Stroke(width = 1.dp.toPx())
+                style = Stroke(width = 1.dp.toPx()),
+                alpha = a2
             )
             drawCircle(
-                color = AccentGreen.copy(alpha = 0.25f),
+                color = AccentGreen,
                 radius = maxR * 0.65f,
                 center = center,
-                style = Stroke(width = 1.dp.toPx())
+                style = Stroke(width = 1.dp.toPx()),
+                alpha = a3
             )
         }
 
@@ -132,29 +184,24 @@ private fun ElevationRing(gpsState: GpsState, acquiringAlpha: Float, colors: App
             Spacer(modifier = Modifier.height(2.dp))
 
             if (gpsState.locked) {
-                val primary  = if (unitSystem == UnitSystem.METRIC) elevationM(gpsState.elevation)
-                               else elevationFt(gpsState.elevation)
-                val subtitle = if (unitSystem == UnitSystem.METRIC)
-                    "${elevationM(gpsState.elevation)} m  ·  ${elevationFt(gpsState.elevation)} ft"
-                else
-                    "${elevationFt(gpsState.elevation)} ft  ·  ${elevationM(gpsState.elevation)} m"
+                val unit    = if (unitSystem == UnitSystem.METRIC) "m" else "ft"
+                val primary = if (unitSystem == UnitSystem.METRIC) elevationM(gpsState.elevation)
+                              else elevationFt(gpsState.elevation)
+                val label   = "$primary $unit"
 
+                var fontSize by remember(label) { mutableStateOf(52.sp) }
                 Text(
-                    text = primary,
-                    fontSize = 52.sp,
+                    text = label,
+                    fontSize = fontSize,
                     fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Light,
                     color = colors.text,
                     lineHeight = 54.sp,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.SansSerif,
-                    color = colors.dimText,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    softWrap = false,
+                    onTextLayout = { result ->
+                        if (result.didOverflowWidth) fontSize = (fontSize.value * 0.875f).sp
+                    }
                 )
             } else {
                 Text(
@@ -167,38 +214,6 @@ private fun ElevationRing(gpsState: GpsState, acquiringAlpha: Float, colors: App
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun SignalBarsRow(satellites: Int, colors: AppColors) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        // 5 bars of increasing height
-        val filledBars = minOf(satellites, 5)
-        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-            for (i in 1..5) {
-                Box(
-                    modifier = Modifier
-                        .width(6.dp)
-                        .height((8 + i * 5).dp)
-                        .background(
-                            color = if (i <= filledBars) AccentGreen else AccentGreen.copy(alpha = 0.18f),
-                            shape = RoundedCornerShape(1.dp)
-                        )
-                )
-            }
-        }
-        Spacer(modifier = Modifier.width(10.dp))
-        Text(
-            text = "$satellites SATELLITES",
-            fontFamily = FontFamily.SansSerif,
-            fontWeight = FontWeight.Bold,
-            fontSize = 10.sp,
-            color = colors.dimText
-        )
     }
 }
 
@@ -243,6 +258,17 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
     }
     val colors = if (isDark) DarkColors else LightColors
 
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val controller = WindowInsetsControllerCompat(
+                (view.context as Activity).window, view
+            )
+            controller.isAppearanceLightStatusBars = !isDark
+            controller.isAppearanceLightNavigationBars = !isDark
+        }
+    }
+
     var showSettings by remember { mutableStateOf(false) }
 
     if (showSettings) {
@@ -262,8 +288,22 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
     LaunchedEffect(Unit) {
         if (!fineLocation.status.isGranted) fineLocation.launchPermissionRequest()
     }
-    LaunchedEffect(fineLocation.status.isGranted) {
-        if (fineLocation.status.isGranted) viewModel.startUpdates()
+
+    // Start/stop GPS updates with the app lifecycle so we don't drain battery in background
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, fineLocation.status.isGranted) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> if (fineLocation.status.isGranted) viewModel.startUpdates()
+                Lifecycle.Event.ON_PAUSE  -> viewModel.stopUpdates()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.stopUpdates()
+        }
     }
 
     // Pulse animation (one-shot on ping)
@@ -321,7 +361,7 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
                         color = colors.text
                     )
                     Text(
-                        text = "ELEVATION VIA GPS",
+                        text = if (gpsState.baroFused) "ELEVATION · GPS + BARO" else "ELEVATION · GPS",
                         fontSize = 9.sp,
                         fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.Bold,
@@ -362,34 +402,57 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // ── Signal bars ───────────────────────────────────────────────────
-            SignalBarsRow(satellites = gpsState.satellites, colors = colors)
-
-            Spacer(modifier = Modifier.height(20.dp))
+            // ── Details header ────────────────────────────────────────────────
+            Text(
+                text = "Details",
+                fontSize = 16.sp,
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Bold,
+                color = colors.text,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, top = 12.dp, bottom = 4.dp)
+            )
 
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 20.dp),
                 color = AccentGreen.copy(alpha = 0.18f)
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // ── Coordinates panel ─────────────────────────────────────────────
+            // ── Details rows ──────────────────────────────────────────────────
             CoordRow(
-                label = "LAT",
+                label = "LATITUDE",
                 value = if (gpsState.locked) formatLat(gpsState.lat) else "---",
                 colors = colors
             )
             CoordRow(
-                label = "LON",
+                label = "LONGITUDE",
                 value = if (gpsState.locked) formatLon(gpsState.lon) else "---",
                 colors = colors
             )
             CoordRow(
-                label = "ACCURACY",
+                label = "HORIZONTAL ACCURACY",
                 value = if (gpsState.locked) formatAccuracy(gpsState.accuracyM, unitSystem) else "---",
                 colors = colors
             )
+            CoordRow(
+                label = "VERTICAL ACCURACY",
+                value = if (gpsState.locked && gpsState.verticalAccuracyM > 0f)
+                    formatAccuracy(gpsState.verticalAccuracyM, unitSystem) else "---",
+                colors = colors
+            )
+            CoordRow(
+                label = "SATELLITES",
+                value = if (gpsState.locked) gpsState.satellites.toString() else "---",
+                colors = colors
+            )
+            if (gpsState.pressureHpa > 0f) {
+                val pressureValue = if (unitSystem == UnitSystem.METRIC)
+                    "${"%.1f".format(gpsState.pressureHpa)} hPa"
+                else
+                    "${"%.2f".format(gpsState.pressureHpa * 0.02953f)} inHg"
+                CoordRow(label = "PRESSURE", value = pressureValue, colors = colors)
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 

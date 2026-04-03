@@ -4,6 +4,10 @@ import android.Manifest
 import android.app.Application
 import android.content.Context
 import android.content.pm.PackageManager
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.location.GnssStatus
 import android.location.Location
 import android.location.LocationListener
@@ -54,6 +58,8 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
         GeoidModel.init(application)
     }
 
+    // ── Location ──────────────────────────────────────────────────────────────
+
     private val locationManager =
         application.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
@@ -68,12 +74,21 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
         } else {
             location.altitude - GeoidModel.undulation(location.latitude, location.longitude)
         }
+
+        // Calibrate the baro offset every GPS fix so baro tracks MSL between fixes
+        val currentBaro = baroAltStd
+        if (currentBaro != null) {
+            baroOffset = altitude - currentBaro
+        }
+
         _gpsState.value = _gpsState.value.copy(
             elevation = altitude,
             lat = location.latitude,
             lon = location.longitude,
             accuracyM = location.accuracy,
-            locked = true
+            verticalAccuracyM = if (location.hasVerticalAccuracy()) location.verticalAccuracyMeters else 0f,
+            locked = true,
+            baroFused = false,   // GPS just updated — baro will take over next sensor tick
         )
     }
 
@@ -83,6 +98,47 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
             _gpsState.value = _gpsState.value.copy(satellites = usedCount)
         }
     }
+
+    // ── Barometer ─────────────────────────────────────────────────────────────
+
+    private val sensorManager =
+        application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    private val pressureSensor: Sensor? =
+        sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
+
+    /** Raw baro altitude relative to standard atmosphere (1013.25 hPa). Null until first reading. */
+    private var baroAltStd: Double? = null
+
+    /** Offset = GPS MSL alt − standard baro alt; calibrated each GPS fix. Null until first GPS fix. */
+    private var baroOffset: Double? = null
+
+    private val baroListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            val pressureHpa = event.values[0]
+            val rawAlt = SensorManager.getAltitude(
+                SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressureHpa
+            ).toDouble()
+            baroAltStd = rawAlt
+
+            val offset = baroOffset
+            val state  = _gpsState.value
+            if (offset != null && state.locked) {
+                // GPS has calibrated us — use baro for smooth inter-fix altitude
+                _gpsState.value = state.copy(
+                    elevation  = rawAlt + offset,
+                    pressureHpa = pressureHpa,
+                    baroFused  = true,
+                )
+            } else {
+                // No GPS calibration yet — just surface the pressure reading
+                _gpsState.value = state.copy(pressureHpa = pressureHpa)
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
+    }
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     private var updatesStarted = false
 
@@ -107,24 +163,41 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
                 gnssCallback,
                 Handler(Looper.getMainLooper())
             )
-            updatesStarted = true
         } catch (_: Exception) {
             // GPS provider unavailable on this device
         }
+
+        pressureSensor?.let {
+            sensorManager.registerListener(
+                baroListener,
+                it,
+                SensorManager.SENSOR_DELAY_UI,
+                Handler(Looper.getMainLooper())
+            )
+        }
+
+        updatesStarted = true
+    }
+
+    fun stopUpdates() {
+        if (!updatesStarted) return
+        try {
+            locationManager.removeUpdates(locationListener)
+            locationManager.unregisterGnssStatusCallback(gnssCallback)
+        } catch (_: Exception) {}
+        try {
+            sensorManager.unregisterListener(baroListener)
+        } catch (_: Exception) {}
+        updatesStarted = false
     }
 
     fun ping() {
-        // Trigger the pulse animation; the GPS listener keeps position data fresh
+        // Trigger the pulse animation; GPS + baro listeners keep data fresh
         _pulseEvent.tryEmit(Unit)
     }
 
     override fun onCleared() {
         super.onCleared()
-        try {
-            locationManager.removeUpdates(locationListener)
-            locationManager.unregisterGnssStatusCallback(gnssCallback)
-        } catch (_: Exception) {
-            // ignore
-        }
+        stopUpdates()
     }
 }
