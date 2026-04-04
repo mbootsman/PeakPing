@@ -117,6 +117,8 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
     private val locationListener = LocationListener { location: Location ->
         // API 34+: use the OS's built-in EGM96 MSL altitude.
         // Older: subtract the EGM96 geoid undulation from the WGS84 ellipsoidal height.
+        if (!location.hasAltitude()) return@LocationListener
+
         val altitude = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
             location.hasMslAltitude()
         ) {

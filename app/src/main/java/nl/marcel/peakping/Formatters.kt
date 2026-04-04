@@ -4,8 +4,8 @@ import java.util.Locale
 
 internal fun formatThousands(n: Int): String = String.format(Locale.US, "%,d", n)
 
-internal fun elevationM(m: Double): String = formatThousands(m.toInt())
-internal fun elevationFt(m: Double): String = formatThousands((m * 3.28084).toInt())
+internal fun elevationM(m: Double): String = m.toInt().toString()
+internal fun elevationFt(m: Double): String = (m * 3.28084).toInt().toString()
 
 internal fun formatLat(lat: Double): String {
     val dir = if (lat >= 0) "N" else "S"

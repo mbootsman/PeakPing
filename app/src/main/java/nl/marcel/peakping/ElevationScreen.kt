@@ -68,12 +68,54 @@ import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.BoxWithConstraints
 
 // ── Sub-composables ───────────────────────────────────────────────────────────
 
 @Composable
 private fun ElevationRing(gpsState: GpsState, acquiringAlpha: Float, colors: AppColors, unitSystem: UnitSystem) {
-    // Staggered pulse animations — always computed, only applied when acquiring
+    if (gpsState.locked) {
+        // GPS locked: no circles, elevation fills 75% of screen width
+        val unit    = if (unitSystem == UnitSystem.METRIC) "m" else "ft"
+        val primary = if (unitSystem == UnitSystem.METRIC) elevationM(gpsState.elevation)
+                      else elevationFt(gpsState.elevation)
+        val label   = "$primary $unit"
+
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val targetWidth = maxWidth * 0.75f
+            var fontSize by remember { mutableStateOf(180.sp) }
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "ELEVATION",
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.dimAccent
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = label,
+                    fontSize = fontSize,
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.Light,
+                    color = colors.text,
+                    textAlign = TextAlign.Center,
+                    softWrap = false,
+                    modifier = Modifier.width(targetWidth),
+                    onTextLayout = { result ->
+                        if (result.didOverflowWidth) fontSize = (fontSize.value * 0.875f).sp
+                    }
+                )
+            }
+        }
+        return
+    }
+
+    // GPS acquiring: show pulsing rings
     val pulseTransition = rememberInfiniteTransition(label = "ringPulse")
     val cycle = 2400
     val dim = 0.12f
@@ -109,10 +151,6 @@ private fun ElevationRing(gpsState: GpsState, acquiringAlpha: Float, colors: App
         }), label = "ra3"
     )
 
-    val a1 = if (gpsState.locked) 1.00f else ringAlpha1
-    val a2 = if (gpsState.locked) 0.45f else ringAlpha2
-    val a3 = if (gpsState.locked) 0.25f else ringAlpha3
-
     Box(
         modifier = Modifier.size(200.dp),
         contentAlignment = Alignment.Center
@@ -126,21 +164,21 @@ private fun ElevationRing(gpsState: GpsState, acquiringAlpha: Float, colors: App
                 radius = maxR,
                 center = center,
                 style = Stroke(width = 2.dp.toPx()),
-                alpha = a1
+                alpha = ringAlpha1
             )
             drawCircle(
                 color = AccentGreen,
                 radius = maxR * 0.82f,
                 center = center,
                 style = Stroke(width = 1.dp.toPx()),
-                alpha = a2
+                alpha = ringAlpha2
             )
             drawCircle(
                 color = AccentGreen,
                 radius = maxR * 0.65f,
                 center = center,
                 style = Stroke(width = 1.dp.toPx()),
-                alpha = a3
+                alpha = ringAlpha3
             )
         }
 
@@ -156,37 +194,14 @@ private fun ElevationRing(gpsState: GpsState, acquiringAlpha: Float, colors: App
                 color = colors.dimAccent
             )
             Spacer(modifier = Modifier.height(2.dp))
-
-            if (gpsState.locked) {
-                val unit    = if (unitSystem == UnitSystem.METRIC) "m" else "ft"
-                val primary = if (unitSystem == UnitSystem.METRIC) elevationM(gpsState.elevation)
-                              else elevationFt(gpsState.elevation)
-                val label   = "$primary $unit"
-
-                var fontSize by remember(label) { mutableStateOf(52.sp) }
-                Text(
-                    text = label,
-                    fontSize = fontSize,
-                    fontFamily = FontFamily.SansSerif,
-                    fontWeight = FontWeight.Light,
-                    color = colors.text,
-                    lineHeight = 54.sp,
-                    textAlign = TextAlign.Center,
-                    softWrap = false,
-                    onTextLayout = { result ->
-                        if (result.didOverflowWidth) fontSize = (fontSize.value * 0.875f).sp
-                    }
-                )
-            } else {
-                Text(
-                    text = "ACQUIRING…",
-                    fontSize = 13.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = AccentGreen,
-                    letterSpacing = 2.sp,
-                    modifier = Modifier.alpha(acquiringAlpha)
-                )
-            }
+            Text(
+                text = "ACQUIRING…",
+                fontSize = 13.sp,
+                fontFamily = FontFamily.Monospace,
+                color = AccentGreen,
+                letterSpacing = 2.sp,
+                modifier = Modifier.alpha(acquiringAlpha)
+            )
         }
     }
 }
