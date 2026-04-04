@@ -1,8 +1,6 @@
 package nl.marcel.peakping
 
 import android.Manifest
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -26,10 +24,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.GpsFixed
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -249,6 +246,7 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
     val savedPins by viewModel.savedPins.collectAsState()
     var showSettings by remember { mutableStateOf(false) }
     var showSaved    by remember { mutableStateOf(false) }
+    var showMap      by remember { mutableStateOf(false) }
     var savedConfirmation by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -284,6 +282,17 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
         return
     }
 
+    if (showMap) {
+        MapScreen(
+            gpsState = gpsState,
+            savedPins = savedPins,
+            unitSystem = unitSystem,
+            colors = colors,
+            onBack = { showMap = false }
+        )
+        return
+    }
+
     // Permission
     val fineLocation = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
     LaunchedEffect(Unit) {
@@ -307,19 +316,6 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
         }
     }
 
-    // Pulse animation (one-shot on ping)
-    val pulseScale = remember { Animatable(1f) }
-    val pulseAlpha = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        viewModel.pulseEvent.collect {
-            pulseScale.snapTo(0.5f)
-            pulseAlpha.snapTo(0.75f)
-            launch {
-                pulseScale.animateTo(2.6f, tween(700, easing = FastOutSlowInEasing))
-            }
-            pulseAlpha.animateTo(0f, tween(700))
-        }
-    }
 
     // Acquiring blink animation
     val infiniteTransition = rememberInfiniteTransition(label = "acquiring")
@@ -455,83 +451,39 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
 
             Spacer(modifier = Modifier.weight(1f))
 
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                color = AccentGreen.copy(alpha = 0.18f)
+            )
+
             // ── Bottom action bar ─────────────────────────────────────────────
-            Box(contentAlignment = Alignment.TopCenter) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 32.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = { showSaved = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Bookmark,
-                            contentDescription = "Saved locations",
-                            tint = if (savedPins.isNotEmpty()) AccentGreen else colors.dimText
-                        )
-                    }
-
-                    // Ping FAB with pulse ring
-                    Box(contentAlignment = Alignment.Center) {
-                        // Expanding pulse ring
-                        Canvas(modifier = Modifier.size(120.dp)) {
-                            val r = 32.dp.toPx() * pulseScale.value
-                            drawCircle(
-                                color = AccentGreen,
-                                radius = r,
-                                alpha = pulseAlpha.value
-                            )
-                        }
-                        // FAB button
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(CircleShape)
-                                .background(AccentGreen)
-                                .clickable { viewModel.ping() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.GpsFixed,
-                                contentDescription = "Ping",
-                                tint = Color.White,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                    }
-
-                    // Spacer to balance the bookmark on the left
-                    Spacer(modifier = Modifier.size(48.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { showSaved = true }) {
+                    Icon(
+                        imageVector = Icons.Default.Bookmark,
+                        contentDescription = "Saved locations",
+                        tint = if (savedPins.isNotEmpty()) AccentGreen else colors.dimText
+                    )
                 }
 
-                // Save confirmation
-                if (savedConfirmation) {
-                    Text(
-                        text = "Saved",
-                        fontSize = 12.sp,
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.Bold,
-                        color = AccentGreen,
-                        modifier = Modifier.padding(top = 4.dp)
+                IconButton(
+                    onClick = { if (gpsState.locked) showMap = true },
+                    enabled = gpsState.locked
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Map,
+                        contentDescription = "Map",
+                        tint = if (gpsState.locked) colors.dimText else colors.dimText.copy(alpha = 0.3f)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // ── Home bar pill ─────────────────────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .width(120.dp)
-                    .height(4.dp)
-                    .background(
-                        color = colors.dimText.copy(alpha = 0.25f),
-                        shape = RoundedCornerShape(2.dp)
-                    )
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
         }
     }
 }
