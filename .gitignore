@@ -7,6 +7,7 @@
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
+/.idea/deploymentTargetSelector.xml
 .DS_Store
 /build
 /captures
@@ -20,6 +21,7 @@ google-services.json
 # Keystore files (do not commit signing keys)
 *.jks
 *.keystore
+keystore.properties
 
 # Log files
 *.log
