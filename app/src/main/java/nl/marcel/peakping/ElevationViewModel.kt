@@ -55,6 +55,14 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
         prefs.edit().putString("unit_system", system.name).apply()
     }
 
+    private val _showLabels = MutableStateFlow(prefs.getBoolean("show_labels", true))
+    val showLabels: StateFlow<Boolean> = _showLabels.asStateFlow()
+
+    fun setShowLabels(show: Boolean) {
+        _showLabels.value = show
+        prefs.edit().putBoolean("show_labels", show).apply()
+    }
+
     // ── Saved pins ────────────────────────────────────────────────────────────
 
     private val _savedPins = MutableStateFlow(
