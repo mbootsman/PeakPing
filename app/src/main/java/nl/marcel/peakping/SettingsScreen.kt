@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -97,6 +98,23 @@ fun SettingsScreen(
 
         SettingsOption("Metric (m)", UnitSystem.METRIC, unitSystem, onUnitSystemChange, colors)
         SettingsOption("Imperial (ft)", UnitSystem.IMPERIAL, unitSystem, onUnitSystemChange, colors)
+
+        // ── About ─────────────────────────────────────────────────────────────
+        val context = LocalContext.current
+        val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+
+        Spacer(modifier = Modifier.weight(1f))
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            color = AccentGreen.copy(alpha = 0.18f)
+        )
+        Text(
+            text = "Version ${packageInfo.versionName} (${packageInfo.longVersionCode})",
+            fontSize = 12.sp,
+            fontFamily = FontFamily.Monospace,
+            color = colors.dimText,
+            modifier = Modifier.padding(start = 24.dp, top = 16.dp, bottom = 24.dp)
+        )
     }
 }
 
