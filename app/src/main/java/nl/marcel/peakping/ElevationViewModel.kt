@@ -73,13 +73,13 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
     private val _saveEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val saveEvent: SharedFlow<Unit> = _saveEvent.asSharedFlow()
 
-    fun saveCurrentLocation() {
+    fun saveCurrentLocation(label: String) {
         val state = _gpsState.value
         if (!state.locked) return
         val now = System.currentTimeMillis()
         val pin = SavedPin(
             id           = now,
-            label        = state.locationName.ifEmpty { formatLat(state.lat) },
+            label        = label.ifBlank { state.locationName.ifEmpty { formatLat(state.lat) } },
             lat          = state.lat,
             lon          = state.lon,
             elevationM   = state.elevation,
@@ -90,6 +90,12 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
         _savedPins.value = updated
         prefs.edit().putString("saved_pins", updated.toJson()).apply()
         _saveEvent.tryEmit(Unit)
+    }
+
+    fun renamePin(id: Long, newLabel: String) {
+        val updated = _savedPins.value.map { if (it.id == id) it.copy(label = newLabel) else it }
+        _savedPins.value = updated
+        prefs.edit().putString("saved_pins", updated.toJson()).apply()
     }
 
     fun deletePin(id: Long) {

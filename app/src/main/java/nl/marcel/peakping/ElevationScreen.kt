@@ -320,7 +320,8 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
             gpsState = gpsState,
             unitSystem = unitSystem,
             colors = colors,
-            onSave = { viewModel.saveCurrentLocation() },
+            onSaveWithName = { viewModel.saveCurrentLocation(it) },
+            onRename = { id, name -> viewModel.renamePin(id, name) },
             onDelete = { viewModel.deletePin(it) },
             onBack = { showSaved = false }
         )
