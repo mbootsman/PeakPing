@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -66,9 +67,12 @@ import androidx.compose.runtime.setValue
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.platform.LocalContext
 
 // ── Sub-composables ───────────────────────────────────────────────────────────
 
@@ -263,6 +267,9 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
     var showSaved    by remember { mutableStateOf(false) }
     var showMap      by remember { mutableStateOf(false) }
     var savedConfirmation by remember { mutableStateOf(false) }
+    var isSharing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         viewModel.saveEvent.collect {
@@ -496,6 +503,35 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
                         contentDescription = "Map",
                         tint = if (gpsState.locked) colors.dimText else colors.dimText.copy(alpha = 0.3f)
                     )
+                }
+
+                Box(contentAlignment = Alignment.Center) {
+                    IconButton(
+                        onClick = {
+                            if (gpsState.locked && !isSharing) {
+                                isSharing = true
+                                scope.launch {
+                                    shareLocation(context, gpsState, isDark, unitSystem)
+                                    isSharing = false
+                                }
+                            }
+                        },
+                        enabled = gpsState.locked && !isSharing
+                    ) {
+                        if (isSharing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = AccentGreen,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Share location",
+                                tint = if (gpsState.locked) colors.dimText else colors.dimText.copy(alpha = 0.3f)
+                            )
+                        }
+                    }
                 }
             }
 
