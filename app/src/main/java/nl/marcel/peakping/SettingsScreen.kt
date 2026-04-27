@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -19,6 +20,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -35,6 +38,8 @@ fun SettingsScreen(
     onThemeChange: (ThemeMode) -> Unit,
     unitSystem: UnitSystem,
     onUnitSystemChange: (UnitSystem) -> Unit,
+    showLabels: Boolean,
+    onShowLabelsChange: (Boolean) -> Unit,
     colors: AppColors,
     onBack: () -> Unit,
 ) {
@@ -98,6 +103,42 @@ fun SettingsScreen(
 
         SettingsOption("Metric (m)", UnitSystem.METRIC, unitSystem, onUnitSystemChange, colors)
         SettingsOption("Imperial (ft)", UnitSystem.IMPERIAL, unitSystem, onUnitSystemChange, colors)
+
+        // ── Display section ───────────────────────────────────────────────────
+        Text(
+            text = "DISPLAY",
+            fontSize = 10.sp,
+            fontFamily = FontFamily.SansSerif,
+            fontWeight = FontWeight.Bold,
+            color = colors.dimAccent,
+            modifier = Modifier.padding(start = 24.dp, top = 24.dp, bottom = 8.dp)
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onShowLabelsChange(!showLabels) }
+                .padding(horizontal = 24.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Show bottom bar labels",
+                fontSize = 15.sp,
+                fontFamily = FontFamily.SansSerif,
+                color = colors.text,
+                modifier = Modifier.weight(1f)
+            )
+            Switch(
+                checked = showLabels,
+                onCheckedChange = onShowLabelsChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = AccentGreen,
+                    checkedTrackColor = AccentGreen.copy(alpha = 0.4f),
+                    uncheckedThumbColor = colors.dimText,
+                    uncheckedTrackColor = colors.dimText.copy(alpha = 0.3f),
+                )
+            )
+        }
 
         // ── About ─────────────────────────────────────────────────────────────
         val context = LocalContext.current

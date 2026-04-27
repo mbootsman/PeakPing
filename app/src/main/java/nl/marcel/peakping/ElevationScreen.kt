@@ -235,6 +235,26 @@ private fun CoordRow(label: String, value: String, colors: AppColors) {
     }
 }
 
+@Composable
+private fun BottomBarButton(
+    label: String,
+    showLabel: Boolean,
+    colors: AppColors,
+    content: @Composable () -> Unit,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        content()
+        if (showLabel) {
+            Text(
+                text = label,
+                fontSize = 10.sp,
+                fontFamily = FontFamily.SansSerif,
+                color = colors.dimText,
+            )
+        }
+    }
+}
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalPermissionsApi::class)
@@ -263,6 +283,7 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
     }
 
     val savedPins by viewModel.savedPins.collectAsState()
+    val showLabels by viewModel.showLabels.collectAsState()
     var showSettings by remember { mutableStateOf(false) }
     var showSaved    by remember { mutableStateOf(false) }
     var showMap      by remember { mutableStateOf(false) }
@@ -285,6 +306,8 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
             onThemeChange = { viewModel.setThemeMode(it) },
             unitSystem = unitSystem,
             onUnitSystemChange = { viewModel.setUnitSystem(it) },
+            showLabels = showLabels,
+            onShowLabelsChange = { viewModel.setShowLabels(it) },
             colors = colors,
             onBack = { showSettings = false }
         )
@@ -486,50 +509,68 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { showSaved = true }) {
-                    Icon(
-                        imageVector = Icons.Default.Bookmark,
-                        contentDescription = "Saved locations",
-                        tint = if (savedPins.isNotEmpty()) AccentGreen else colors.dimText
-                    )
-                }
-
-                IconButton(
-                    onClick = { if (gpsState.locked) showMap = true },
-                    enabled = gpsState.locked
+                BottomBarButton(
+                    label = "Saved",
+                    showLabel = showLabels,
+                    colors = colors,
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Map,
-                        contentDescription = "Map",
-                        tint = if (gpsState.locked) colors.dimText else colors.dimText.copy(alpha = 0.3f)
-                    )
+                    IconButton(onClick = { showSaved = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Bookmark,
+                            contentDescription = "Saved locations",
+                            tint = if (savedPins.isNotEmpty()) AccentGreen else colors.dimText
+                        )
+                    }
                 }
 
-                Box(contentAlignment = Alignment.Center) {
+                BottomBarButton(
+                    label = "Map",
+                    showLabel = showLabels,
+                    colors = colors,
+                ) {
                     IconButton(
-                        onClick = {
-                            if (gpsState.locked && !isSharing) {
-                                isSharing = true
-                                scope.launch {
-                                    shareLocation(context, gpsState, isDark, unitSystem)
-                                    isSharing = false
-                                }
-                            }
-                        },
-                        enabled = gpsState.locked && !isSharing
+                        onClick = { if (gpsState.locked) showMap = true },
+                        enabled = gpsState.locked
                     ) {
-                        if (isSharing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                color = AccentGreen,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = "Share location",
-                                tint = if (gpsState.locked) colors.dimText else colors.dimText.copy(alpha = 0.3f)
-                            )
+                        Icon(
+                            imageVector = Icons.Default.Map,
+                            contentDescription = "Map",
+                            tint = if (gpsState.locked) colors.dimText else colors.dimText.copy(alpha = 0.3f)
+                        )
+                    }
+                }
+
+                BottomBarButton(
+                    label = "Share",
+                    showLabel = showLabels,
+                    colors = colors,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        IconButton(
+                            onClick = {
+                                if (gpsState.locked && !isSharing) {
+                                    isSharing = true
+                                    scope.launch {
+                                        shareLocation(context, gpsState, isDark, unitSystem)
+                                        isSharing = false
+                                    }
+                                }
+                            },
+                            enabled = gpsState.locked && !isSharing
+                        ) {
+                            if (isSharing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = AccentGreen,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Share location",
+                                    tint = if (gpsState.locked) colors.dimText else colors.dimText.copy(alpha = 0.3f)
+                                )
+                            }
                         }
                     }
                 }
