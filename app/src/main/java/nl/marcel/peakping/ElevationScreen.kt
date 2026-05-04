@@ -26,12 +26,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import android.app.Activity
 import androidx.compose.runtime.DisposableEffect
@@ -289,6 +296,8 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
     var showMap      by remember { mutableStateOf(false) }
     var savedConfirmation by remember { mutableStateOf(false) }
     var isSharing by remember { mutableStateOf(false) }
+    var showSaveDialog by remember { mutableStateOf(false) }
+    var saveLabel by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -497,10 +506,63 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
 
             Spacer(modifier = Modifier.weight(1f))
 
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                FloatingActionButton(
+                    onClick = {
+                        if (gpsState.locked) {
+                            saveLabel = gpsState.locationName
+                            showSaveDialog = true
+                        }
+                    },
+                    containerColor = if (gpsState.locked) AccentGreen else colors.dimText.copy(alpha = 0.3f),
+                    contentColor = if (gpsState.locked) Color.Black else colors.dimText.copy(alpha = 0.5f),
+                    elevation = FloatingActionButtonDefaults.elevation(
+                        defaultElevation = 0.dp,
+                        pressedElevation = 0.dp,
+                        focusedElevation = 0.dp,
+                        hoveredElevation = 0.dp
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.BookmarkAdd,
+                        contentDescription = "Save location"
+                    )
+                }
+            }
+
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 20.dp),
                 color = AccentGreen.copy(alpha = 0.18f)
             )
+
+            if (!gpsState.locked) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(12.dp),
+                        color = AccentGreen,
+                        strokeWidth = 1.5.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Acquiring GPS fix — map, share and save unavailable",
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.SansSerif,
+                        color = colors.dimText,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
 
             // ── Bottom action bar ─────────────────────────────────────────────
             Row(
@@ -519,7 +581,7 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
                         Icon(
                             imageVector = Icons.Default.Bookmark,
                             contentDescription = "Saved locations",
-                            tint = if (savedPins.isNotEmpty()) AccentGreen else colors.dimText
+                            tint = colors.dimText
                         )
                     }
                 }
@@ -578,5 +640,42 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
             }
 
         }
+
+    }
+
+    // ── Save location dialog ──────────────────────────────────────────────────
+    if (showSaveDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showSaveDialog = false
+                saveLabel = ""
+            },
+            title = { Text("Save location") },
+            text = {
+                OutlinedTextField(
+                    value = saveLabel,
+                    onValueChange = { saveLabel = it },
+                    label = { Text("Name") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.saveCurrentLocation(saveLabel)
+                    showSaveDialog = false
+                    saveLabel = ""
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showSaveDialog = false
+                    saveLabel = ""
+                }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
