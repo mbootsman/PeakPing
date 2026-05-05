@@ -40,6 +40,10 @@ PeakPing is an Android app that displays real-time GPS elevation and accuracy da
 - Location permissions (`ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`) are handled at runtime using the Accompanist permissions library
 - Dark theme is enabled by default
 
+## Changelog
+
+After every `git commit`, update `CHANGELOG.md` at the project root to reflect the changes in that commit. Group entries under the appropriate version heading (or add a new `[Unreleased]` section if no version has been tagged yet). Use the same section structure already in the file: Added / Changed / Fixed / Removed.
+
 ## Permissions
 
 ```xml
