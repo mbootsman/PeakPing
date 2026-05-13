@@ -6,13 +6,13 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-val keystorePropsFile = rootProject.file("keystore.properties")
+val keystorePropsFile: File = rootProject.file("keystore.properties")
 val keystoreProps = Properties()
 if (keystorePropsFile.exists()) {
     keystoreProps.load(keystorePropsFile.inputStream())
 }
 
-android {
+configure<com.android.build.api.dsl.ApplicationExtension> {
     namespace = "nl.marcel.peakping"
     compileSdk = 36
 
@@ -29,7 +29,7 @@ android {
         applicationId = "nl.marcel.peakping"
         minSdk = 33
         targetSdk = 36
-        versionCode = 4
+        versionCode = 5
         versionName = "1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -49,9 +49,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
-    }
     buildFeatures {
         compose = true
     }
@@ -68,6 +65,12 @@ tasks.register("checkEgm96Asset") {
             logger.warn("⚠ EGM96 geoid asset missing — altitude will be WGS84 on Android < 14.")
             logger.warn("  Fix: python3 scripts/generate_geoid.py")
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11
     }
 }
 
