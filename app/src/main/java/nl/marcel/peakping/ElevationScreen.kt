@@ -1,6 +1,7 @@
 package nl.marcel.peakping
 
 import android.Manifest
+import android.content.res.Configuration
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,7 +25,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkAdd
@@ -39,6 +43,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import android.app.Activity
 import androidx.compose.runtime.DisposableEffect
@@ -47,6 +52,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
@@ -86,7 +92,6 @@ import androidx.compose.ui.platform.LocalContext
 @Composable
 private fun ElevationRing(gpsState: GpsState, acquiringAlpha: Float, colors: AppColors, unitSystem: UnitSystem) {
     if (gpsState.locked) {
-        // GPS locked: no circles, elevation fills 75% of screen width
         val unit    = if (unitSystem == UnitSystem.METRIC) "m" else "ft"
         val primary = if (unitSystem == UnitSystem.METRIC) elevationM(gpsState.elevation)
                       else elevationFt(gpsState.elevation)
@@ -126,7 +131,6 @@ private fun ElevationRing(gpsState: GpsState, acquiringAlpha: Float, colors: App
         return
     }
 
-    // GPS acquiring: show pulsing rings
     val pulseTransition = rememberInfiniteTransition(label = "ringPulse")
     val cycle = 2400
     val dim = 0.12f
@@ -218,11 +222,11 @@ private fun ElevationRing(gpsState: GpsState, acquiringAlpha: Float, colors: App
 }
 
 @Composable
-private fun CoordRow(label: String, value: String, colors: AppColors) {
+private fun CoordRow(label: String, value: String, colors: AppColors, compact: Boolean = false) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 7.dp),
+            .padding(horizontal = 24.dp, vertical = if (compact) 3.dp else 7.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -258,6 +262,166 @@ private fun BottomBarButton(
                 fontFamily = FontFamily.SansSerif,
                 color = colors.dimText,
             )
+        }
+    }
+}
+
+@Composable
+private fun TopBar(
+    gpsState: GpsState,
+    themeMode: ThemeMode,
+    colors: AppColors,
+    onThemeCycle: () -> Unit,
+    onSettingsClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 8.dp, top = 2.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "PeakPing",
+                fontSize = 22.sp,
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Bold,
+                color = colors.text
+            )
+            if (gpsState.locationName.isNotEmpty()) {
+                Text(
+                    text = gpsState.locationName,
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.SansSerif,
+                    color = colors.dimText
+                )
+            }
+        }
+        IconButton(onClick = onThemeCycle) {
+            Icon(
+                imageVector = when (themeMode) {
+                    ThemeMode.SYSTEM -> Icons.Default.BrightnessAuto
+                    ThemeMode.DARK   -> Icons.Default.DarkMode
+                    ThemeMode.LIGHT  -> Icons.Default.LightMode
+                },
+                contentDescription = "Cycle theme",
+                tint = colors.dimText
+            )
+        }
+        IconButton(onClick = onSettingsClick) {
+            Icon(
+                imageVector = Icons.Default.Settings,
+                contentDescription = "Settings",
+                tint = colors.dimText
+            )
+        }
+    }
+}
+
+@Composable
+private fun DetailSection(gpsState: GpsState, unitSystem: UnitSystem, colors: AppColors, compact: Boolean = false) {
+    Text(
+        text = "Details",
+        fontSize = 16.sp,
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Bold,
+        color = colors.text,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 24.dp, top = if (compact) 4.dp else 12.dp, bottom = if (compact) 2.dp else 4.dp)
+    )
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 20.dp),
+        color = AccentGreen.copy(alpha = 0.18f)
+    )
+    CoordRow(label = "LATITUDE",            value = if (gpsState.locked) formatLat(gpsState.lat) else "---", colors = colors, compact = compact)
+    CoordRow(label = "LONGITUDE",           value = if (gpsState.locked) formatLon(gpsState.lon) else "---", colors = colors, compact = compact)
+    CoordRow(label = "HORIZONTAL ACCURACY", value = if (gpsState.locked) formatAccuracy(gpsState.accuracyM, unitSystem) else "---", colors = colors, compact = compact)
+    CoordRow(
+        label = "VERTICAL ACCURACY",
+        value = if (gpsState.locked && gpsState.verticalAccuracyM > 0f) formatAccuracy(gpsState.verticalAccuracyM, unitSystem) else "---",
+        colors = colors,
+        compact = compact
+    )
+    CoordRow(label = "SATELLITES", value = if (gpsState.satellites > 0) gpsState.satellites.toString() else "---", colors = colors, compact = compact)
+    if (gpsState.pressureHpa > 0f) {
+        CoordRow(label = "PRESSURE", value = formatPressure(gpsState.pressureHpa, unitSystem), colors = colors, compact = compact)
+    }
+}
+
+@Composable
+private fun BottomActionSection(
+    gpsState: GpsState,
+    showLabels: Boolean,
+    isSharing: Boolean,
+    colors: AppColors,
+    onSavedClick: () -> Unit,
+    onMapClick: () -> Unit,
+    onShareClick: () -> Unit,
+) {
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 20.dp),
+        color = AccentGreen.copy(alpha = 0.18f)
+    )
+
+    if (!gpsState.locked) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(12.dp), color = AccentGreen, strokeWidth = 1.5.dp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Acquiring GPS fix — map, share and save unavailable",
+                fontSize = 11.sp,
+                fontFamily = FontFamily.SansSerif,
+                color = colors.dimText,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 32.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        BottomBarButton(label = "Saved", showLabel = showLabels, colors = colors) {
+            IconButton(onClick = onSavedClick) {
+                Icon(imageVector = Icons.Default.Bookmark, contentDescription = "Saved locations", tint = colors.dimText)
+            }
+        }
+        BottomBarButton(label = "Map", showLabel = showLabels, colors = colors) {
+            IconButton(onClick = { if (gpsState.locked) onMapClick() }, enabled = gpsState.locked) {
+                Icon(
+                    imageVector = Icons.Default.Map,
+                    contentDescription = "Map",
+                    tint = if (gpsState.locked) colors.dimText else colors.dimText.copy(alpha = 0.3f)
+                )
+            }
+        }
+        BottomBarButton(label = "Share", showLabel = showLabels, colors = colors) {
+            Box(contentAlignment = Alignment.Center) {
+                IconButton(
+                    onClick = { if (gpsState.locked && !isSharing) onShareClick() },
+                    enabled = gpsState.locked && !isSharing
+                ) {
+                    if (isSharing) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = AccentGreen, strokeWidth = 2.dp)
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share location",
+                            tint = if (gpsState.locked) colors.dimText else colors.dimText.copy(alpha = 0.3f)
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -301,6 +465,7 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
     var saveLabel by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     LaunchedEffect(Unit) {
         viewModel.saveEvent.collect {
@@ -351,13 +516,11 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
         return
     }
 
-    // Permission
     val fineLocation = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
     LaunchedEffect(Unit) {
         if (!fineLocation.status.isGranted) fineLocation.launchPermissionRequest()
     }
 
-    // Start/stop GPS updates with the app lifecycle so we don't drain battery in background
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, fineLocation.status.isGranted) {
         val observer = LifecycleEventObserver { _, event ->
@@ -374,8 +537,6 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
         }
     }
 
-
-    // Acquiring blink animation
     val infiniteTransition = rememberInfiniteTransition(label = "acquiring")
     val acquiringAlpha by infiniteTransition.animateFloat(
         initialValue = 0.15f,
@@ -387,263 +548,128 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
         label = "acquiringAlpha"
     )
 
+    val onThemeCycle: () -> Unit = {
+        viewModel.setThemeMode(when (themeMode) {
+            ThemeMode.SYSTEM -> ThemeMode.DARK
+            ThemeMode.DARK   -> ThemeMode.LIGHT
+            ThemeMode.LIGHT  -> ThemeMode.SYSTEM
+        })
+    }
+    val onShareClick: () -> Unit = {
+        isSharing = true
+        scope.launch {
+            shareLocation(context, gpsState, isDark, unitSystem)
+            isSharing = false
+        }
+    }
+    val onSaveClick: () -> Unit = {
+        saveLabel = gpsState.locationName
+        showSaveDialog = true
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(colors.bg)
     ) {
-        Column(
+        // ── Floating save FAB (bottom-left) ───────────────────────────────────
+        FloatingActionButton(
+            onClick = { if (gpsState.locked) onSaveClick() },
             modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding(),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .align(Alignment.BottomStart)
+                .navigationBarsPadding()
+                .padding(start = 16.dp, bottom = if (isLandscape) 16.dp else 80.dp),
+            containerColor = if (gpsState.locked) AccentGreen else colors.dimText.copy(alpha = 0.3f),
+            contentColor = if (gpsState.locked) Color.Black else colors.dimText.copy(alpha = 0.5f),
+            elevation = FloatingActionButtonDefaults.elevation(
+                defaultElevation = 2.dp,
+                pressedElevation = 4.dp,
+                focusedElevation = 2.dp,
+                hoveredElevation = 2.dp
+            )
         ) {
-
-            // ── Top bar ───────────────────────────────────────────────────────
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 20.dp, end = 8.dp, top = 20.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "PeakPing",
-                        fontSize = 22.sp,
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.text
-                    )
-                    if (gpsState.locationName.isNotEmpty()) {
-                        Text(
-                            text = gpsState.locationName,
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.SansSerif,
-                            color = colors.dimText
-                        )
-                    }
-
-                }
-                IconButton(onClick = {
-                    val next = when (themeMode) {
-                        ThemeMode.SYSTEM -> ThemeMode.DARK
-                        ThemeMode.DARK   -> ThemeMode.LIGHT
-                        ThemeMode.LIGHT  -> ThemeMode.SYSTEM
-                    }
-                    viewModel.setThemeMode(next)
-                }) {
-                    Icon(
-                        imageVector = when (themeMode) {
-                            ThemeMode.SYSTEM -> Icons.Default.BrightnessAuto
-                            ThemeMode.DARK   -> Icons.Default.DarkMode
-                            ThemeMode.LIGHT  -> Icons.Default.LightMode
-                        },
-                        contentDescription = "Cycle theme",
-                        tint = colors.dimText
-                    )
-                }
-                IconButton(onClick = { showSettings = true }) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings",
-                        tint = colors.dimText
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // ── Elevation ring ────────────────────────────────────────────────
-            ElevationRing(gpsState = gpsState, acquiringAlpha = acquiringAlpha, colors = colors, unitSystem = unitSystem)
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // ── Details header ────────────────────────────────────────────────
-            Text(
-                text = "Details",
-                fontSize = 16.sp,
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.Bold,
-                color = colors.text,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 24.dp, top = 12.dp, bottom = 4.dp)
-            )
-
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 20.dp),
-                color = AccentGreen.copy(alpha = 0.18f)
-            )
-
-            // ── Details rows ──────────────────────────────────────────────────
-            CoordRow(
-                label = "LATITUDE",
-                value = if (gpsState.locked) formatLat(gpsState.lat) else "---",
-                colors = colors
-            )
-            CoordRow(
-                label = "LONGITUDE",
-                value = if (gpsState.locked) formatLon(gpsState.lon) else "---",
-                colors = colors
-            )
-            CoordRow(
-                label = "HORIZONTAL ACCURACY",
-                value = if (gpsState.locked) formatAccuracy(gpsState.accuracyM, unitSystem) else "---",
-                colors = colors
-            )
-            CoordRow(
-                label = "VERTICAL ACCURACY",
-                value = if (gpsState.locked && gpsState.verticalAccuracyM > 0f)
-                    formatAccuracy(gpsState.verticalAccuracyM, unitSystem) else "---",
-                colors = colors
-            )
-            CoordRow(
-                label = "SATELLITES",
-                value = if (gpsState.satellites > 0) gpsState.satellites.toString() else "---",
-                colors = colors
-            )
-            if (gpsState.pressureHpa > 0f) {
-                CoordRow(label = "PRESSURE", value = formatPressure(gpsState.pressureHpa, unitSystem), colors = colors)
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.End
-            ) {
-                FloatingActionButton(
-                    onClick = {
-                        if (gpsState.locked) {
-                            saveLabel = gpsState.locationName
-                            showSaveDialog = true
-                        }
-                    },
-                    containerColor = if (gpsState.locked) AccentGreen else colors.dimText.copy(alpha = 0.3f),
-                    contentColor = if (gpsState.locked) Color.Black else colors.dimText.copy(alpha = 0.5f),
-                    elevation = FloatingActionButtonDefaults.elevation(
-                        defaultElevation = 0.dp,
-                        pressedElevation = 0.dp,
-                        focusedElevation = 0.dp,
-                        hoveredElevation = 0.dp
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.BookmarkAdd,
-                        contentDescription = "Save location"
-                    )
-                }
-            }
-
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 20.dp),
-                color = AccentGreen.copy(alpha = 0.18f)
-            )
-
-            if (!gpsState.locked) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(12.dp),
-                        color = AccentGreen,
-                        strokeWidth = 1.5.dp
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Acquiring GPS fix — map, share and save unavailable",
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.SansSerif,
-                        color = colors.dimText,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-
-            // ── Bottom action bar ─────────────────────────────────────────────
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                BottomBarButton(
-                    label = "Saved",
-                    showLabel = showLabels,
-                    colors = colors,
-                ) {
-                    IconButton(onClick = { showSaved = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Bookmark,
-                            contentDescription = "Saved locations",
-                            tint = colors.dimText
-                        )
-                    }
-                }
-
-                BottomBarButton(
-                    label = "Map",
-                    showLabel = showLabels,
-                    colors = colors,
-                ) {
-                    IconButton(
-                        onClick = { if (gpsState.locked) showMap = true },
-                        enabled = gpsState.locked
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Map,
-                            contentDescription = "Map",
-                            tint = if (gpsState.locked) colors.dimText else colors.dimText.copy(alpha = 0.3f)
-                        )
-                    }
-                }
-
-                BottomBarButton(
-                    label = "Share",
-                    showLabel = showLabels,
-                    colors = colors,
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        IconButton(
-                            onClick = {
-                                if (gpsState.locked && !isSharing) {
-                                    isSharing = true
-                                    scope.launch {
-                                        shareLocation(context, gpsState, isDark, unitSystem)
-                                        isSharing = false
-                                    }
-                                }
-                            },
-                            enabled = gpsState.locked && !isSharing
-                        ) {
-                            if (isSharing) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    color = AccentGreen,
-                                    strokeWidth = 2.dp
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = "Share location",
-                                    tint = if (gpsState.locked) colors.dimText else colors.dimText.copy(alpha = 0.3f)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
+            Icon(imageVector = Icons.Default.BookmarkAdd, contentDescription = "Save location")
         }
 
+        if (isLandscape) {
+            // ── Landscape: ring left, details+actions right ───────────────────
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+            ) {
+                TopBar(gpsState, themeMode, colors, onThemeCycle, { showSettings = true })
+
+                Row(modifier = Modifier.weight(1f)) {
+                    // Left: elevation ring
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        ElevationRing(gpsState = gpsState, acquiringAlpha = acquiringAlpha, colors = colors, unitSystem = unitSystem)
+                    }
+
+                    VerticalDivider(color = AccentGreen.copy(alpha = 0.18f))
+
+                    // Right: scrollable details + bottom actions
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            DetailSection(gpsState = gpsState, unitSystem = unitSystem, colors = colors, compact = true)
+                        }
+                        BottomActionSection(
+                            gpsState = gpsState,
+                            showLabels = showLabels,
+                            isSharing = isSharing,
+                            colors = colors,
+                            onSavedClick = { showSaved = true },
+                            onMapClick = { showMap = true },
+                            onShareClick = onShareClick
+                        )
+                    }
+                }
+            }
+        } else {
+            // ── Portrait: stacked layout ──────────────────────────────────────
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                TopBar(gpsState, themeMode, colors, onThemeCycle, { showSettings = true })
+
+                Spacer(modifier = Modifier.height(12.dp))
+                ElevationRing(gpsState = gpsState, acquiringAlpha = acquiringAlpha, colors = colors, unitSystem = unitSystem)
+                Spacer(modifier = Modifier.height(20.dp))
+
+                DetailSection(gpsState = gpsState, unitSystem = unitSystem, colors = colors)
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                BottomActionSection(
+                    gpsState = gpsState,
+                    showLabels = showLabels,
+                    isSharing = isSharing,
+                    colors = colors,
+                    onSavedClick = { showSaved = true },
+                    onMapClick = { showMap = true },
+                    onShareClick = onShareClick
+                )
+            }
+        }
     }
 
     // ── Save location dialog ──────────────────────────────────────────────────
