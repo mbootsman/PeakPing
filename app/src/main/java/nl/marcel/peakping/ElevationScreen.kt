@@ -85,7 +85,10 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.platform.LocalContext
+
+private const val MAX_LABEL_LENGTH = 40
 
 // ── Sub-composables ───────────────────────────────────────────────────────────
 
@@ -576,9 +579,13 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
         FloatingActionButton(
             onClick = { if (gpsState.locked) onSaveClick() },
             modifier = Modifier
-                .align(Alignment.BottomStart)
+                .align(if (isLandscape) Alignment.BottomStart else Alignment.BottomEnd)
                 .navigationBarsPadding()
-                .padding(start = 16.dp, bottom = if (isLandscape) 16.dp else 80.dp),
+                .padding(
+                    start = if (isLandscape) 16.dp else 0.dp,
+                    end = if (isLandscape) 0.dp else 16.dp,
+                    bottom = if (isLandscape) 16.dp else 96.dp
+                ),
             containerColor = if (gpsState.locked) AccentGreen else colors.dimText.copy(alpha = 0.3f),
             contentColor = if (gpsState.locked) Color.Black else colors.dimText.copy(alpha = 0.5f),
             elevation = FloatingActionButtonDefaults.elevation(
@@ -683,9 +690,16 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
             text = {
                 OutlinedTextField(
                     value = saveLabel,
-                    onValueChange = { saveLabel = it },
+                    onValueChange = { if (it.length <= MAX_LABEL_LENGTH) saveLabel = it },
                     label = { Text("Name") },
-                    singleLine = true
+                    singleLine = true,
+                    supportingText = {
+                        Text(
+                            text = "${saveLabel.length} / $MAX_LABEL_LENGTH",
+                            color = if (saveLabel.length >= MAX_LABEL_LENGTH)
+                                MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 )
             },
             confirmButton = {
