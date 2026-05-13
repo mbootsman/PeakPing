@@ -2,6 +2,26 @@
 
 All notable changes to PeakPing are documented in this file.
 
+## [1.4] — 2026-05-13
+
+### Added
+- GPS update frequency setting: new slider in Settings › GPS Update Frequency lets users choose 1 s / 2 s / 5 s / 10 s update intervals; selection is persisted and takes effect immediately without restarting the app
+- Landscape layout: two-column view with the elevation ring on the left and scrollable detail rows + action bar on the right; all details fit on-screen in compact mode
+- Bookmark name length limit: 40-character cap enforced while typing, with a live `n / 40` character counter in the save dialog that turns red at the limit
+
+### Changed
+- Save (BookmarkAdd) FAB is now a floating button: bottom-right in portrait (above the action bar), bottom-left in landscape
+- Settings screen is now scrollable — no content is cut off in landscape or on small screens
+- Reduced top-bar top padding by 90 % for a tighter, less padded header
+- Slider tick labels in the GPS frequency setting are pixel-aligned to their corresponding tick marks
+
+### Fixed
+- Migrated `kotlinOptions { jvmTarget }` to `kotlin { compilerOptions { } }` (deprecated AGP 9.0 DSL)
+- Replaced `android { }` block with `configure<ApplicationExtension> { }` to silence AGP 10.0 removal warning
+- Explicit `File` type annotation on `keystorePropsFile` to resolve platform-type nullability warning
+
+---
+
 ## [1.3] — 2026-05-04
 
 ### Added
