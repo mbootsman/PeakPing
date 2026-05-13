@@ -25,6 +25,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+enum class UpdateInterval(val ms: Long, val label: String) {
+    ONE_SEC(1_000L, "1 second"),
+    TWO_SEC(2_000L, "2 seconds"),
+    FIVE_SEC(5_000L, "5 seconds"),
+    TEN_SEC(10_000L, "10 seconds"),
+}
+
 class ElevationViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _gpsState = MutableStateFlow(GpsState.Empty)
@@ -61,6 +68,19 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
     fun setShowLabels(show: Boolean) {
         _showLabels.value = show
         prefs.edit().putBoolean("show_labels", show).apply()
+    }
+
+    private val _updateInterval = MutableStateFlow(
+        UpdateInterval.valueOf(prefs.getString("update_interval", UpdateInterval.ONE_SEC.name) ?: UpdateInterval.ONE_SEC.name)
+    )
+    val updateInterval: StateFlow<UpdateInterval> = _updateInterval.asStateFlow()
+
+    fun setUpdateInterval(interval: UpdateInterval) {
+        _updateInterval.value = interval
+        prefs.edit().putString("update_interval", interval.name).apply()
+        if (updatesStarted) {
+            restartLocationUpdates()
+        }
     }
 
     // ── Saved pins ────────────────────────────────────────────────────────────
@@ -222,7 +242,7 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
         try {
             locationManager.requestLocationUpdates(
                 LocationManager.GPS_PROVIDER,
-                1000L,
+                _updateInterval.value.ms,
                 0f,
                 locationListener,
                 Looper.getMainLooper()
@@ -245,6 +265,25 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
         }
 
         updatesStarted = true
+    }
+
+    private fun restartLocationUpdates() {
+        val context = getApplication<Application>()
+        if (ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) return
+        try {
+            locationManager.removeUpdates(locationListener)
+            locationManager.requestLocationUpdates(
+                LocationManager.GPS_PROVIDER,
+                _updateInterval.value.ms,
+                0f,
+                locationListener,
+                Looper.getMainLooper()
+            )
+        } catch (_: Exception) {}
     }
 
     fun stopUpdates() {

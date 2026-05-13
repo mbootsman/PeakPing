@@ -291,6 +291,7 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
 
     val savedPins by viewModel.savedPins.collectAsState()
     val showLabels by viewModel.showLabels.collectAsState()
+    val updateInterval by viewModel.updateInterval.collectAsState()
     var showSettings by remember { mutableStateOf(false) }
     var showSaved    by remember { mutableStateOf(false) }
     var showMap      by remember { mutableStateOf(false) }
@@ -317,6 +318,8 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
             onUnitSystemChange = { viewModel.setUnitSystem(it) },
             showLabels = showLabels,
             onShowLabelsChange = { viewModel.setShowLabels(it) },
+            updateInterval = updateInterval,
+            onUpdateIntervalChange = { viewModel.setUpdateInterval(it) },
             colors = colors,
             onBack = { showSettings = false }
         )

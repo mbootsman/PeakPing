@@ -3,15 +3,18 @@ package nl.marcel.peakping
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -20,17 +23,21 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 
 @Composable
 fun SettingsScreen(
@@ -40,6 +47,8 @@ fun SettingsScreen(
     onUnitSystemChange: (UnitSystem) -> Unit,
     showLabels: Boolean,
     onShowLabelsChange: (Boolean) -> Unit,
+    updateInterval: UpdateInterval,
+    onUpdateIntervalChange: (UpdateInterval) -> Unit,
     colors: AppColors,
     onBack: () -> Unit,
 ) {
@@ -138,6 +147,81 @@ fun SettingsScreen(
                     uncheckedTrackColor = colors.dimText.copy(alpha = 0.3f),
                 )
             )
+        }
+
+        // ── GPS UPDATE FREQUENCY section ──────────────────────────────────────
+        Text(
+            text = "GPS UPDATE FREQUENCY",
+            fontSize = 10.sp,
+            fontFamily = FontFamily.SansSerif,
+            fontWeight = FontWeight.Bold,
+            color = colors.dimAccent,
+            modifier = Modifier.padding(start = 24.dp, top = 24.dp, bottom = 4.dp)
+        )
+
+        val intervals = UpdateInterval.entries
+        val currentIndex = intervals.indexOf(updateInterval)
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Update every",
+                fontSize = 15.sp,
+                fontFamily = FontFamily.SansSerif,
+                color = colors.text
+            )
+            Text(
+                text = updateInterval.label,
+                fontSize = 15.sp,
+                fontFamily = FontFamily.SansSerif,
+                color = AccentGreen
+            )
+        }
+
+        Slider(
+            value = currentIndex.toFloat(),
+            onValueChange = { onUpdateIntervalChange(intervals[it.roundToInt()]) },
+            valueRange = 0f..(intervals.size - 1).toFloat(),
+            steps = intervals.size - 2,
+            modifier = Modifier.padding(horizontal = 16.dp),
+            colors = SliderDefaults.colors(
+                thumbColor = AccentGreen,
+                activeTrackColor = AccentGreen,
+                inactiveTrackColor = colors.dimText.copy(alpha = 0.3f),
+                activeTickColor = colors.bg,
+                inactiveTickColor = colors.dimText.copy(alpha = 0.5f),
+            )
+        )
+
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 2.dp)
+        ) {
+            val thumbRadius = 10.dp
+            val trackWidth = maxWidth - thumbRadius * 2
+            intervals.forEachIndexed { index, interval ->
+                val fraction = index.toFloat() / (intervals.size - 1)
+                Text(
+                    text = "${interval.ms / 1000}s",
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (interval == updateInterval) AccentGreen else colors.dimText,
+                    modifier = Modifier
+                        .offset(x = thumbRadius + trackWidth * fraction)
+                        .layout { measurable, constraints ->
+                            val placeable = measurable.measure(constraints.copy(minWidth = 0))
+                            layout(0, placeable.height) {
+                                placeable.place(-placeable.width / 2, 0)
+                            }
+                        }
+                )
+            }
         }
 
         // ── About ─────────────────────────────────────────────────────────────
