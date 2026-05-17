@@ -18,7 +18,7 @@ configure<com.android.build.api.dsl.ApplicationExtension> {
 
     signingConfigs {
         create("release") {
-            storeFile = keystoreProps.getProperty("storeFile")?.let { file(it) }
+            storeFile = keystoreProps.getProperty("storeFile")?.let { rootProject.file(it) }
             storePassword = keystoreProps.getProperty("storePassword")
             keyAlias = keystoreProps.getProperty("keyAlias")
             keyPassword = keystoreProps.getProperty("keyPassword")
@@ -29,8 +29,8 @@ configure<com.android.build.api.dsl.ApplicationExtension> {
         applicationId = "nl.marcel.peakping"
         minSdk = 33
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.4"
+        versionCode = 6
+        versionName = "1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
