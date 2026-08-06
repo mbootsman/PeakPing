@@ -87,6 +87,10 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.compose.runtime.rememberUpdatedState
 
 private const val MAX_LABEL_LENGTH = 40
 
@@ -470,6 +474,50 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
     val context = LocalContext.current
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
+    // ── Floating window state (must be before early returns so the lifecycle
+    //    observer fires even while the Settings sub-screen is visible) ─────────
+    val floatingWindowEnabled by viewModel.floatingWindowEnabled.collectAsState()
+    var pendingOverlayEnable by remember { mutableStateOf(false) }
+    val lifecycleOwnerEarly = LocalLifecycleOwner.current
+    val currentPending = rememberUpdatedState(pendingOverlayEnable)
+
+    DisposableEffect(lifecycleOwnerEarly) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.syncFloatingWindowState()
+                if (currentPending.value) {
+                    pendingOverlayEnable = false
+                    if (Settings.canDrawOverlays(context)) {
+                        FloatingWindowService.start(context)
+                        viewModel.setFloatingWindowEnabled(true)
+                    }
+                }
+            }
+        }
+        lifecycleOwnerEarly.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwnerEarly.lifecycle.removeObserver(observer) }
+    }
+
+    val onFloatingWindowToggle: (Boolean) -> Unit = { enabled ->
+        if (enabled) {
+            if (Settings.canDrawOverlays(context)) {
+                FloatingWindowService.start(context)
+                viewModel.setFloatingWindowEnabled(true)
+            } else {
+                pendingOverlayEnable = true
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:${context.packageName}")
+                    ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+                )
+            }
+        } else {
+            FloatingWindowService.stop(context)
+            viewModel.setFloatingWindowEnabled(false)
+        }
+    }
+
     LaunchedEffect(Unit) {
         viewModel.saveEvent.collect {
             savedConfirmation = true
@@ -488,6 +536,8 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
             onShowLabelsChange = { viewModel.setShowLabels(it) },
             updateInterval = updateInterval,
             onUpdateIntervalChange = { viewModel.setUpdateInterval(it) },
+            floatingWindowEnabled = floatingWindowEnabled,
+            onFloatingWindowToggle = onFloatingWindowToggle,
             colors = colors,
             onBack = { showSettings = false }
         )

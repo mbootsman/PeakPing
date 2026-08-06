@@ -70,6 +70,17 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
         prefs.edit().putBoolean("show_labels", show).apply()
     }
 
+    private val _floatingWindowEnabled = MutableStateFlow(FloatingWindowService.isRunning)
+    val floatingWindowEnabled: StateFlow<Boolean> = _floatingWindowEnabled.asStateFlow()
+
+    fun setFloatingWindowEnabled(enabled: Boolean) {
+        _floatingWindowEnabled.value = enabled
+    }
+
+    fun syncFloatingWindowState() {
+        _floatingWindowEnabled.value = FloatingWindowService.isRunning
+    }
+
     private val _updateInterval = MutableStateFlow(
         UpdateInterval.valueOf(prefs.getString("update_interval", UpdateInterval.ONE_SEC.name) ?: UpdateInterval.ONE_SEC.name)
     )

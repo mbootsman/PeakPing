@@ -52,6 +52,8 @@ fun SettingsScreen(
     onShowLabelsChange: (Boolean) -> Unit,
     updateInterval: UpdateInterval,
     onUpdateIntervalChange: (UpdateInterval) -> Unit,
+    floatingWindowEnabled: Boolean,
+    onFloatingWindowToggle: (Boolean) -> Unit,
     colors: AppColors,
     onBack: () -> Unit,
 ) {
@@ -144,6 +146,39 @@ fun SettingsScreen(
             Switch(
                 checked = showLabels,
                 onCheckedChange = onShowLabelsChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = AccentGreen,
+                    checkedTrackColor = AccentGreen.copy(alpha = 0.4f),
+                    uncheckedThumbColor = colors.dimText,
+                    uncheckedTrackColor = colors.dimText.copy(alpha = 0.3f),
+                )
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onFloatingWindowToggle(!floatingWindowEnabled) }
+                .padding(horizontal = 24.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Floating elevation window",
+                    fontSize = 15.sp,
+                    fontFamily = FontFamily.SansSerif,
+                    color = colors.text
+                )
+                Text(
+                    text = "Shows altitude over other apps",
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.SansSerif,
+                    color = colors.dimText
+                )
+            }
+            Switch(
+                checked = floatingWindowEnabled,
+                onCheckedChange = onFloatingWindowToggle,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = AccentGreen,
                     checkedTrackColor = AccentGreen.copy(alpha = 0.4f),
