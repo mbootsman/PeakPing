@@ -70,6 +70,17 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
         prefs.edit().putBoolean("show_labels", show).apply()
     }
 
+    private val _floatingWindowEnabled = MutableStateFlow(FloatingWindowService.isRunning)
+    val floatingWindowEnabled: StateFlow<Boolean> = _floatingWindowEnabled.asStateFlow()
+
+    fun setFloatingWindowEnabled(enabled: Boolean) {
+        _floatingWindowEnabled.value = enabled
+    }
+
+    fun syncFloatingWindowState() {
+        _floatingWindowEnabled.value = FloatingWindowService.isRunning
+    }
+
     private val _updateInterval = MutableStateFlow(
         UpdateInterval.valueOf(prefs.getString("update_interval", UpdateInterval.ONE_SEC.name) ?: UpdateInterval.ONE_SEC.name)
     )
@@ -122,6 +133,17 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
         val updated = _savedPins.value.filter { it.id != id }
         _savedPins.value = updated
         prefs.edit().putString("saved_pins", updated.toJson()).apply()
+    }
+
+    /** Merges imported pins, skipping any whose id already exists. Returns count of newly added pins. */
+    fun importPins(imported: List<SavedPin>): Int {
+        val existingIds = _savedPins.value.map { it.id }.toSet()
+        val newPins = imported.filter { it.id !in existingIds }
+        if (newPins.isEmpty()) return 0
+        val updated = _savedPins.value + newPins
+        _savedPins.value = updated
+        prefs.edit().putString("saved_pins", updated.toJson()).apply()
+        return newPins.size
     }
 
     init {

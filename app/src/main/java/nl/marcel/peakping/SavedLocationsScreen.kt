@@ -1,6 +1,8 @@
 package nl.marcel.peakping
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +23,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -65,13 +70,41 @@ fun SavedLocationsScreen(
     onSaveWithName: (String) -> Unit,
     onRename: (Long, String) -> Unit,
     onDelete: (Long) -> Unit,
+    onExport: () -> Unit,
+    onImport: (List<SavedPin>) -> Int,
     onBack: () -> Unit,
 ) {
-    BackHandler(onBack = onBack)
-
+    val context = LocalContext.current
     var showSaveDialog by remember { mutableStateOf(false) }
     var renamePin by remember { mutableStateOf<SavedPin?>(null) }
     var pendingDelete by remember { mutableStateOf<SavedPin?>(null) }
+    var importMessage by remember { mutableStateOf<String?>(null) }
+
+    val handleBack = {
+        pendingDelete?.let { onDelete(it.id) }
+        onBack()
+    }
+    BackHandler(onBack = handleBack)
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        val json = context.contentResolver.openInputStream(uri)?.bufferedReader()?.readText()
+            ?: return@rememberLauncherForActivityResult
+        val parsed = pinsFromJson(json)
+        if (parsed.isEmpty()) {
+            importMessage = "No valid locations found in file"
+        } else {
+            val added = onImport(parsed)
+            importMessage = if (added == 0) "All locations already saved" else "$added location(s) imported"
+        }
+    }
+
+    LaunchedEffect(importMessage) {
+        if (importMessage != null) {
+            delay(3000L)
+            importMessage = null
+        }
+    }
 
     // Commit the delete after 4 seconds unless Undo is tapped
     LaunchedEffect(pendingDelete) {
@@ -127,10 +160,10 @@ fun SavedLocationsScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 4.dp, end = 20.dp, top = 12.dp, bottom = 8.dp),
+                .padding(start = 4.dp, end = 4.dp, top = 12.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
+            IconButton(onClick = handleBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
@@ -142,8 +175,23 @@ fun SavedLocationsScreen(
                 fontSize = 22.sp,
                 fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.Bold,
-                color = colors.text
+                color = colors.text,
+                modifier = Modifier.weight(1f)
             )
+            IconButton(onClick = { importLauncher.launch("application/json") }) {
+                Icon(
+                    imageVector = Icons.Default.FileDownload,
+                    contentDescription = "Import locations",
+                    tint = colors.dimText
+                )
+            }
+            IconButton(onClick = onExport, enabled = pins.isNotEmpty()) {
+                Icon(
+                    imageVector = Icons.Default.FileUpload,
+                    contentDescription = "Export locations",
+                    tint = if (pins.isNotEmpty()) colors.dimText else colors.dimText.copy(alpha = 0.3f)
+                )
+            }
         }
 
         HorizontalDivider(color = AccentGreen.copy(alpha = 0.18f))
@@ -238,6 +286,19 @@ fun SavedLocationsScreen(
             }
         ) {
             Text("\"${deleted.label}\" deleted")
+        }
+    }
+
+    importMessage?.let { msg ->
+        Snackbar(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            containerColor = Color(0xFF1A2A3A),
+            contentColor = Color.White,
+        ) {
+            Text(msg)
         }
     }
 

@@ -2,6 +2,25 @@
 
 All notable changes to PeakPing are documented in this file.
 
+## [1.6] — 2026-08-06
+
+### Added
+- Floating elevation window: a draggable overlay that shows the current altitude over other apps via a foreground service; toggle lives in Settings › Display › Floating elevation window
+- Overlay permission flow: if the "Draw over other apps" permission has not been granted, the toggle automatically directs the user to the Android permission screen and enables the window on return
+- Notification while the floating window is active with a one-tap "Close" action to stop the service without reopening the app
+- Export saved locations: share a `peakping_locations.json` file from the Saved Locations screen via the system share sheet
+- Import saved locations: pick a previously exported JSON file to restore pins; duplicates are skipped and a snackbar confirms how many were added
+
+### Changed
+- Save location FAB is now hidden while GPS is acquiring — it only appears once a fix is locked
+- Navigating back from Saved Locations now immediately commits any pending deletion instead of silently cancelling it
+
+### Fixed
+- Deleting a saved location and navigating back before the undo timer expired would restore the item on the next visit — pending deletes are now committed on back navigation
+- Removed 7 deprecated AGP properties from `gradle.properties` whose defaults have since changed; suppressed a spurious large-project performance warning
+
+---
+
 ## [1.4] — 2026-05-13
 
 ### Added

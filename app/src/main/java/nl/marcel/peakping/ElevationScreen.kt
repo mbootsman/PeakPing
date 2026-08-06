@@ -87,6 +87,10 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.compose.runtime.rememberUpdatedState
 
 private const val MAX_LABEL_LENGTH = 40
 
@@ -470,6 +474,50 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
     val context = LocalContext.current
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
+    // ── Floating window state (must be before early returns so the lifecycle
+    //    observer fires even while the Settings sub-screen is visible) ─────────
+    val floatingWindowEnabled by viewModel.floatingWindowEnabled.collectAsState()
+    var pendingOverlayEnable by remember { mutableStateOf(false) }
+    val lifecycleOwnerEarly = LocalLifecycleOwner.current
+    val currentPending = rememberUpdatedState(pendingOverlayEnable)
+
+    DisposableEffect(lifecycleOwnerEarly) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.syncFloatingWindowState()
+                if (currentPending.value) {
+                    pendingOverlayEnable = false
+                    if (Settings.canDrawOverlays(context)) {
+                        FloatingWindowService.start(context)
+                        viewModel.setFloatingWindowEnabled(true)
+                    }
+                }
+            }
+        }
+        lifecycleOwnerEarly.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwnerEarly.lifecycle.removeObserver(observer) }
+    }
+
+    val onFloatingWindowToggle: (Boolean) -> Unit = { enabled ->
+        if (enabled) {
+            if (Settings.canDrawOverlays(context)) {
+                FloatingWindowService.start(context)
+                viewModel.setFloatingWindowEnabled(true)
+            } else {
+                pendingOverlayEnable = true
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:${context.packageName}")
+                    ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+                )
+            }
+        } else {
+            FloatingWindowService.stop(context)
+            viewModel.setFloatingWindowEnabled(false)
+        }
+    }
+
     LaunchedEffect(Unit) {
         viewModel.saveEvent.collect {
             savedConfirmation = true
@@ -488,6 +536,8 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
             onShowLabelsChange = { viewModel.setShowLabels(it) },
             updateInterval = updateInterval,
             onUpdateIntervalChange = { viewModel.setUpdateInterval(it) },
+            floatingWindowEnabled = floatingWindowEnabled,
+            onFloatingWindowToggle = onFloatingWindowToggle,
             colors = colors,
             onBack = { showSettings = false }
         )
@@ -503,6 +553,8 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
             onSaveWithName = { viewModel.saveCurrentLocation(it) },
             onRename = { id, name -> viewModel.renamePin(id, name) },
             onDelete = { viewModel.deletePin(it) },
+            onExport = { exportPins(context, savedPins) },
+            onImport = { viewModel.importPins(it) },
             onBack = { showSaved = false }
         )
         return
@@ -575,27 +627,29 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
             .fillMaxSize()
             .background(colors.bg)
     ) {
-        // ── Floating save FAB (bottom-left) ───────────────────────────────────
-        FloatingActionButton(
-            onClick = { if (gpsState.locked) onSaveClick() },
-            modifier = Modifier
-                .align(if (isLandscape) Alignment.BottomStart else Alignment.BottomEnd)
-                .navigationBarsPadding()
-                .padding(
-                    start = if (isLandscape) 16.dp else 0.dp,
-                    end = if (isLandscape) 0.dp else 16.dp,
-                    bottom = if (isLandscape) 16.dp else 96.dp
-                ),
-            containerColor = if (gpsState.locked) AccentGreen else colors.dimText.copy(alpha = 0.3f),
-            contentColor = if (gpsState.locked) Color.Black else colors.dimText.copy(alpha = 0.5f),
-            elevation = FloatingActionButtonDefaults.elevation(
-                defaultElevation = 2.dp,
-                pressedElevation = 4.dp,
-                focusedElevation = 2.dp,
-                hoveredElevation = 2.dp
-            )
-        ) {
-            Icon(imageVector = Icons.Default.BookmarkAdd, contentDescription = "Save location")
+        // ── Floating save FAB — only shown once GPS is locked ─────────────────
+        if (gpsState.locked) {
+            FloatingActionButton(
+                onClick = onSaveClick,
+                modifier = Modifier
+                    .align(if (isLandscape) Alignment.BottomStart else Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(
+                        start = if (isLandscape) 16.dp else 0.dp,
+                        end = if (isLandscape) 0.dp else 16.dp,
+                        bottom = if (isLandscape) 16.dp else 96.dp
+                    ),
+                containerColor = AccentGreen,
+                contentColor = Color.Black,
+                elevation = FloatingActionButtonDefaults.elevation(
+                    defaultElevation = 2.dp,
+                    pressedElevation = 4.dp,
+                    focusedElevation = 2.dp,
+                    hoveredElevation = 2.dp
+                )
+            ) {
+                Icon(imageVector = Icons.Default.BookmarkAdd, contentDescription = "Save location")
+            }
         }
 
         if (isLandscape) {
