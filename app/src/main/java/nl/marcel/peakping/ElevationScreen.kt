@@ -627,27 +627,29 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
             .fillMaxSize()
             .background(colors.bg)
     ) {
-        // ── Floating save FAB (bottom-left) ───────────────────────────────────
-        FloatingActionButton(
-            onClick = { if (gpsState.locked) onSaveClick() },
-            modifier = Modifier
-                .align(if (isLandscape) Alignment.BottomStart else Alignment.BottomEnd)
-                .navigationBarsPadding()
-                .padding(
-                    start = if (isLandscape) 16.dp else 0.dp,
-                    end = if (isLandscape) 0.dp else 16.dp,
-                    bottom = if (isLandscape) 16.dp else 96.dp
-                ),
-            containerColor = if (gpsState.locked) AccentGreen else colors.dimText.copy(alpha = 0.3f),
-            contentColor = if (gpsState.locked) Color.Black else colors.dimText.copy(alpha = 0.5f),
-            elevation = FloatingActionButtonDefaults.elevation(
-                defaultElevation = 2.dp,
-                pressedElevation = 4.dp,
-                focusedElevation = 2.dp,
-                hoveredElevation = 2.dp
-            )
-        ) {
-            Icon(imageVector = Icons.Default.BookmarkAdd, contentDescription = "Save location")
+        // ── Floating save FAB — only shown once GPS is locked ─────────────────
+        if (gpsState.locked) {
+            FloatingActionButton(
+                onClick = onSaveClick,
+                modifier = Modifier
+                    .align(if (isLandscape) Alignment.BottomStart else Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(
+                        start = if (isLandscape) 16.dp else 0.dp,
+                        end = if (isLandscape) 0.dp else 16.dp,
+                        bottom = if (isLandscape) 16.dp else 96.dp
+                    ),
+                containerColor = AccentGreen,
+                contentColor = Color.Black,
+                elevation = FloatingActionButtonDefaults.elevation(
+                    defaultElevation = 2.dp,
+                    pressedElevation = 4.dp,
+                    focusedElevation = 2.dp,
+                    hoveredElevation = 2.dp
+                )
+            ) {
+                Icon(imageVector = Icons.Default.BookmarkAdd, contentDescription = "Save location")
+            }
         }
 
         if (isLandscape) {

@@ -74,13 +74,17 @@ fun SavedLocationsScreen(
     onImport: (List<SavedPin>) -> Int,
     onBack: () -> Unit,
 ) {
-    BackHandler(onBack = onBack)
-
     val context = LocalContext.current
     var showSaveDialog by remember { mutableStateOf(false) }
     var renamePin by remember { mutableStateOf<SavedPin?>(null) }
     var pendingDelete by remember { mutableStateOf<SavedPin?>(null) }
     var importMessage by remember { mutableStateOf<String?>(null) }
+
+    val handleBack = {
+        pendingDelete?.let { onDelete(it.id) }
+        onBack()
+    }
+    BackHandler(onBack = handleBack)
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri ?: return@rememberLauncherForActivityResult
@@ -159,7 +163,7 @@ fun SavedLocationsScreen(
                 .padding(start = 4.dp, end = 4.dp, top = 12.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
+            IconButton(onClick = handleBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
