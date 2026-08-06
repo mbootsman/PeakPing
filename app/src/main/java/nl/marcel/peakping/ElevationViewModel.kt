@@ -135,6 +135,17 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
         prefs.edit().putString("saved_pins", updated.toJson()).apply()
     }
 
+    /** Merges imported pins, skipping any whose id already exists. Returns count of newly added pins. */
+    fun importPins(imported: List<SavedPin>): Int {
+        val existingIds = _savedPins.value.map { it.id }.toSet()
+        val newPins = imported.filter { it.id !in existingIds }
+        if (newPins.isEmpty()) return 0
+        val updated = _savedPins.value + newPins
+        _savedPins.value = updated
+        prefs.edit().putString("saved_pins", updated.toJson()).apply()
+        return newPins.size
+    }
+
     init {
         GeoidModel.init(application)
     }

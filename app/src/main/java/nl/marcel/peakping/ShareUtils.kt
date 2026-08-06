@@ -29,6 +29,19 @@ private const val TILE_PX = 256
 private const val GRID    = 3
 private const val MAP_ZOOM = 15
 
+fun exportPins(context: Context, pins: List<SavedPin>) {
+    val cacheDir = File(context.cacheDir, "share").also { it.mkdirs() }
+    val file = File(cacheDir, "peakping_locations.json")
+    file.writeText(pins.toJson())
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "application/json"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, null))
+}
+
 fun osmUrl(lat: Double, lon: Double) =
     String.format(
         java.util.Locale.US,

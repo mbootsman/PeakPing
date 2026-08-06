@@ -136,21 +136,21 @@ class FloatingWindowService : Service() {
                 setColor(Color.argb(209, 8, 14, 20))
                 cornerRadius = dp(18).toFloat()
             }
-            setPadding(dp(14), dp(8), dp(10), dp(8))
+            setPadding(dp(28), dp(16), dp(20), dp(16))
             gravity = Gravity.CENTER_VERTICAL
         }
 
         elevationText = TextView(this).apply {
             text = "--"
             textSize = 20f
-            setTextColor(Color.parseColor("#00AAB3"))   // AccentGreen / Summit
+            setTextColor(Color.WHITE)
             typeface = android.graphics.Typeface.MONOSPACE
         }
 
         unitText = TextView(this).apply {
             text = " m"
             textSize = 14f
-            setTextColor(Color.parseColor("#00AAB3"))
+            setTextColor(Color.WHITE)
             typeface = android.graphics.Typeface.MONOSPACE
         }
 

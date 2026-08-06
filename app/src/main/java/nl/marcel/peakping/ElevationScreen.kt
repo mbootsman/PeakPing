@@ -553,6 +553,8 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
             onSaveWithName = { viewModel.saveCurrentLocation(it) },
             onRename = { id, name -> viewModel.renamePin(id, name) },
             onDelete = { viewModel.deletePin(it) },
+            onExport = { exportPins(context, savedPins) },
+            onImport = { viewModel.importPins(it) },
             onBack = { showSaved = false }
         )
         return
