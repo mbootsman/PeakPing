@@ -2,7 +2,7 @@
 
 All notable changes to PeakPing are documented in this file.
 
-## [Unreleased]
+## [1.7] — 2026-09-14
 
 ### Added
 - Quick Settings tile to start/stop the floating elevation overlay directly from the notification shade, without opening the app
