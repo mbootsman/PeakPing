@@ -87,8 +87,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.platform.LocalContext
-import android.content.Intent
-import android.net.Uri
 import android.provider.Settings
 import androidx.compose.runtime.rememberUpdatedState
 
@@ -505,12 +503,7 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
                 viewModel.setFloatingWindowEnabled(true)
             } else {
                 pendingOverlayEnable = true
-                context.startActivity(
-                    Intent(
-                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        Uri.parse("package:${context.packageName}")
-                    ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                )
+                context.startActivity(OverlayController.requestPermissionIntent(context))
             }
         } else {
             FloatingWindowService.stop(context)

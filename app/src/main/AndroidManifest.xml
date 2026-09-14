@@ -28,12 +28,34 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+
+        <activity
+            android:name=".OverlayShortcutActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay" />
 
         <service
             android:name=".FloatingWindowService"
             android:foregroundServiceType="location"
             android:exported="false" />
+
+        <service
+            android:name=".OverlayTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_peak"
+            android:label="@string/tile_overlay_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"
