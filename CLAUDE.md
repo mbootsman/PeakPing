@@ -12,7 +12,7 @@ PeakPing is an Android app that displays real-time GPS elevation and accuracy da
 - **Location**: Google Play Services Fused Location Provider
 - **Build**: Gradle with Kotlin DSL (Gradle 9.3.1)
 - **Min SDK**: 33 | **Compile SDK**: 36 | **Target SDK**: 36
-- **Current version**: 1.6 (versionCode 7)
+- **Current version**: 1.7 (versionCode 8)
 
 ## Key Files
 
