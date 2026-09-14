@@ -1,5 +1,7 @@
 package nl.marcel.peakping
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -38,6 +40,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -273,11 +276,27 @@ fun SettingsScreen(
             color = AccentGreen.copy(alpha = 0.18f)
         )
         Text(
+            text = "Share feedback about PeakPing",
+            fontSize = 12.sp,
+            fontFamily = FontFamily.Monospace,
+            color = AccentGreen,
+            textDecoration = TextDecoration.Underline,
+            modifier = Modifier
+                .padding(start = 24.dp, top = 16.dp)
+                .clickable {
+                    val intent = Intent(Intent.ACTION_SENDTO).apply {
+                        data = Uri.parse("mailto:marcel@bootsman.org")
+                        putExtra(Intent.EXTRA_SUBJECT, "PeakPing feedback")
+                    }
+                    context.startActivity(intent)
+                }
+        )
+        Text(
             text = "Version ${packageInfo.versionName} (${packageInfo.longVersionCode})",
             fontSize = 12.sp,
             fontFamily = FontFamily.Monospace,
             color = colors.dimText,
-            modifier = Modifier.padding(start = 24.dp, top = 16.dp, bottom = 24.dp)
+            modifier = Modifier.padding(start = 24.dp, top = 4.dp, bottom = 24.dp)
         )
     }
 }

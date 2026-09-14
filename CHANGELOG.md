@@ -8,6 +8,7 @@ All notable changes to PeakPing are documented in this file.
 - Quick Settings tile to start/stop the floating elevation overlay directly from the notification shade, without opening the app
 - App shortcut (long-press the launcher icon) to toggle the floating elevation overlay
 - Both new entry points prompt for the "Draw over other apps" permission on first use if it hasn't been granted yet
+- "Share feedback about PeakPing" link in Settings, above the version string, which opens an email to the developer
 
 ### Fixed
 - Quick Settings tile tap did nothing (crash-looped `FloatingWindowService` in the background): starting a `foregroundServiceType="location"` service requires a foreground/Activity caller, which `TileService.onClick()` doesn't qualify as. The tile now hands off to the same trampoline activity the app shortcut uses when starting the overlay, and stops it directly (no restriction on that path)
