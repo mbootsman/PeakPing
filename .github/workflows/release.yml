@@ -1,0 +1,128 @@
+# Release pipeline: push a version tag (e.g. `git tag -a v1.9.0 -m "PeakPing 1.9" && git push origin v1.9.0`)
+#
+#   1. Checks the tag matches versionName in app/build.gradle.kts
+#   2. Builds the signed release APK + AAB
+#   3. Uploads the AAB to Google Play (internal testing track — promote in Play Console)
+#   4. Creates a GitHub release with the APK and the matching CHANGELOG.md section
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   KEYSTORE_BASE64               base64 of peakping-release.jks
+#   KEYSTORE_PASSWORD             storePassword
+#   KEY_ALIAS                     keyAlias
+#   KEY_PASSWORD                  keyPassword
+#   PLAY_SERVICE_ACCOUNT_JSON     contents of the Play service-account JSON key
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write   # create the GitHub release
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Check tag matches versionName
+        id: version
+        run: |
+          VERSION_NAME=$(sed -nE 's/^\s*versionName = "([^"]+)"/\1/p' app/build.gradle.kts | head -1)
+          TAG="${GITHUB_REF_NAME}"
+          echo "versionName=${VERSION_NAME}, tag=${TAG}"
+          if [ "$TAG" != "v${VERSION_NAME}" ] && [ "$TAG" != "v${VERSION_NAME}.0" ]; then
+            echo "::error::Tag ${TAG} does not match versionName ${VERSION_NAME} (expected v${VERSION_NAME} or v${VERSION_NAME}.0). Bump the version before tagging."
+            exit 1
+          fi
+          echo "name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Restore signing config
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          for v in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            [ -n "${!v}" ] || { echo "::error::Missing repository secret $v"; exit 1; }
+          done
+          echo "$KEYSTORE_BASE64" | base64 --decode > peakping-release.jks
+          {
+            echo "storeFile=peakping-release.jks"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > keystore.properties
+
+      - name: Build signed APK and AAB
+        run: ./gradlew :app:assembleRelease :app:bundleRelease
+
+      - name: Upload to Google Play (internal track)
+        env:
+          ANDROID_PUBLISHER_CREDENTIALS: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          [ -n "$ANDROID_PUBLISHER_CREDENTIALS" ] || { echo "::error::Missing repository secret PLAY_SERVICE_ACCOUNT_JSON"; exit 1; }
+          ./gradlew :app:publishReleaseBundle
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+        run: |
+          APK="PeakPing-${VERSION_NAME}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$APK"
+          SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+
+          # This version's section of CHANGELOG.md (between "## [x.y]" and the next "---"/"## [")
+          CHANGES=$(awk -v v="$VERSION_NAME" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            found && (/^## \[/ || /^---/) { exit }
+            found { print }
+          ' CHANGELOG.md)
+          if [ -z "$(echo "$CHANGES" | tr -d '[:space:]')" ]; then
+            echo "::error::No CHANGELOG.md section found for [${VERSION_NAME}]"
+            exit 1
+          fi
+
+          {
+            echo "## PeakPing ${VERSION_NAME}"
+            echo "$CHANGES"
+            echo
+            echo "### Installing this APK"
+            echo "Download \`${APK}\` below and open it on your phone (allow \"Install unknown apps\" when asked)."
+            echo
+            echo "**Note:** If you installed PeakPing from Google Play (or via Aurora Store), Android won't install this APK over it, because Play builds are signed with a different key. Either keep getting updates from Play, or export your saved locations, uninstall the Play version, install this APK and import them again."
+            echo
+            echo "SHA-256: \`${SHA}\`"
+            echo
+            echo "Full changelog: [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/CHANGELOG.md)"
+          } > release-notes.md
+
+          gh release create "$GITHUB_REF_NAME" "$APK" \
+            --title "PeakPing ${VERSION_NAME}" \
+            --notes-file release-notes.md \
+            --verify-tag \
+            --latest
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f peakping-release.jks keystore.properties

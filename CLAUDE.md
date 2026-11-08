@@ -52,6 +52,12 @@ PeakPing is an Android app that displays real-time GPS elevation and accuracy da
 
 Google Play uploads use Gradle Play Publisher (`com.github.triplet.play`, 4.x for AGP 9), configured in the `play {}` block of `app/build.gradle.kts`. It uploads to the **internal** track; promote to production from Play Console. Credentials are a Play Console service-account JSON key, found via `playServiceAccountFile=` in the gitignored `keystore.properties` or the `ANDROID_PUBLISHER_CREDENTIALS` env var (for CI) — never commit the key. Before publishing: bump `versionCode`/`versionName` and update the release-notes file. Only the `*Release*` publish tasks apply; the debug variant (`.dev`) doesn't exist on Play. `playConfigs {}` isn't usable here (it needs the legacy `android {}` DSL type).
 
+### Releasing (CI)
+
+`.github/workflows/release.yml` runs on any pushed `v*` tag. It fails unless the tag is `v<versionName>` or `v<versionName>.0` and `CHANGELOG.md` has a `## [<versionName>]` section. It builds the signed APK + AAB, uploads the AAB to Play's internal track, and creates the GitHub release with `PeakPing-<versionName>.apk` and that CHANGELOG section as notes. Signing and Play credentials come from repository secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`.
+
+Release steps: bump `versionCode`/`versionName` → rename `[Unreleased]` in `CHANGELOG.md` to `[x.y] — date` → update the Play release-notes file → commit + push → `git tag -a vX.Y.0 -m "PeakPing X.Y" && git push origin vX.Y.0` → promote from internal to production in Play Console.
+
 Debug builds use `applicationIdSuffix = ".dev"` (package `nl.marcel.peakping.dev`, label "PeakPing Dev", version `x.y-dev`) so they install side-by-side with the Play Store version, which is signed with Google's Play App Signing key and can't be replaced by a locally signed APK. Debug-only overrides live in `app/src/debug/res/` (app name, tile/shortcut labels, and a copy of `xml/shortcuts.xml` whose `targetPackage` must stay in sync with the main one).
 
 ## Architecture Notes
