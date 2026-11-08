@@ -36,6 +36,13 @@ configure<com.android.build.api.dsl.ApplicationExtension> {
     }
 
     buildTypes {
+        debug {
+            // Installs side-by-side with the Play/store version (which is signed
+            // with Google's key and can't be replaced by a locally signed build).
+            // Name/shortcut overrides live in src/debug/res.
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+        }
         release {
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true

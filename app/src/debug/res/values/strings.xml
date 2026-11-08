@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-only overrides so the dev build is distinguishable from the store install. -->
+<resources>
+    <string name="app_name">PeakPing Dev</string>
+    <string name="tile_overlay_label">Overlay (Dev)</string>
+    <string name="shortcut_overlay_short_label">PeakPing Dev Overlay</string>
+    <string name="shortcut_overlay_long_label">Toggle PeakPing Dev overlay</string>
+</resources>

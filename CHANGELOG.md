@@ -8,6 +8,7 @@ All notable changes to PeakPing are documented in this file.
 - Settings: "GPS update frequency" renamed to "Update frequency", with a caption listing what it applies to on this device (GPS, Satellites, and Barometer when the phone has one)
 - The floating elevation window now follows the selected update frequency instead of always updating every second (takes effect the next time the overlay is started)
 - Place names (reverse geocoding) are now looked up at most once every 30 seconds instead of on every GPS fix, reducing network use
+- Development: debug builds now install as a separate "PeakPing Dev" app (`nl.marcel.peakping.dev`) alongside the store version
 
 ### Fixed
 - The update frequency slider had no visible effect: barometer and satellite readings kept refreshing the screen many times per second. On-screen updates now follow the selected interval (the barometer is still sampled continuously in the background to stay calibrated)

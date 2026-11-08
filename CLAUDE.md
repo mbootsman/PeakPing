@@ -46,6 +46,8 @@ PeakPing is an Android app that displays real-time GPS elevation and accuracy da
 ./gradlew lint                   # Run lint checks
 ```
 
+Debug builds use `applicationIdSuffix = ".dev"` (package `nl.marcel.peakping.dev`, label "PeakPing Dev", version `x.y-dev`) so they install side-by-side with the Play Store version, which is signed with Google's Play App Signing key and can't be replaced by a locally signed APK. Debug-only overrides live in `app/src/debug/res/` (app name, tile/shortcut labels, and a copy of `xml/shortcuts.xml` whose `targetPackage` must stay in sync with the main one).
+
 ## Architecture Notes
 
 - GPS updates are requested from `LocationManager.GPS_PROVIDER` at the user-selected **update interval** (Settings > Update frequency: 1/2/5/10 s, `UpdateInterval` enum, persisted as `update_interval`); the barometer is sampled continuously but barometer- and satellite-driven UI updates are throttled to the same interval. `FloatingWindowService` reads the same preference when it starts
