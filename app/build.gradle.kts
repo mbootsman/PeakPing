@@ -45,7 +45,11 @@ configure<com.android.build.api.dsl.ApplicationExtension> {
             versionNameSuffix = "-dev"
         }
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // Without keystore.properties (e.g. F-Droid's build server, which signs
+            // with its own key) this produces an unsigned app-release-unsigned.apk.
+            if (keystorePropsFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -60,6 +64,12 @@ configure<com.android.build.api.dsl.ApplicationExtension> {
     }
     buildFeatures {
         compose = true
+    }
+    dependenciesInfo {
+        // The APK's dependency-metadata block is encrypted with a Google key and
+        // can't be verified; F-Droid rejects it. Play reads it from the AAB only.
+        includeInApk = false
+        includeInBundle = true
     }
 }
 

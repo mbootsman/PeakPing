@@ -1,0 +1,36 @@
+PeakPing - Real-Time GPS Altimeter for Android
+
+Know exactly how high you are. PeakPing gives you precise, real-time GPS elevation data directly from your device's GPS hardware. No internet required, no accounts, no ads.
+
+Whether you're hiking a mountain trail, cycling through the hills, or simply curious about your altitude, PeakPing delivers accurate readings you can trust.
+
+WHAT PEAKPING SHOWS YOU
+• Elevation above sea level, updated at the interval you choose: every 1, 2, 5 or 10 seconds
+• Horizontal and vertical GPS accuracy
+• Number of GPS satellites currently in use
+• Atmospheric pressure (on devices with a barometer)
+• Your current city and country, looked up automatically when online
+
+ACCURATE ALTITUDE, EVEN BETWEEN GPS FIXES
+PeakPing uses your device's barometer (if available) to provide smooth, continuous altitude readings between GPS updates. The barometer is automatically calibrated against each GPS fix for maximum accuracy.
+
+FLOATING ELEVATION WINDOW
+Keep your altitude in view no matter what app you're using. Enable the floating window from Settings and a small, draggable overlay shows your current elevation on top of any screen. Perfect for checking your altitude mid-hike without switching apps. A persistent notification lets you close it with one tap.
+
+SAVE YOUR LOCATIONS
+Found a spot worth remembering? Tap the quick-save button to instantly pin your current location with its coordinates, elevation, and place name. You can rename any saved pin to something meaningful, and if you accidentally delete one, a brief undo option lets you bring it back. Back up your saved locations by exporting them to a JSON file, and restore or merge them on any device with the import option. Your saved locations are stored locally on your device and can be deleted at any time.
+
+BUILT FOR PRIVACY
+PeakPing does not collect, transmit, or share any personal data. No analytics. No crash reporting. No advertising networks. Your locations and saved pins stay on your device. An internet connection is only used for map tiles (OpenStreetMap) and place names.
+
+OPEN SOURCE
+PeakPing is free and open source, licensed under GPLv3. You can inspect the source code, contribute, or build it yourself: https://github.com/mbootsman/PeakPing
+
+NO GOOGLE PLAY SERVICES
+PeakPing uses only standard Android location APIs, so it also works on phones without Google services, such as GrapheneOS, LineageOS and /e/OS. (Place names depend on your phone's built-in geocoder.)
+
+REQUIREMENTS
+• Android 13 or higher
+• GPS hardware required
+• Barometer optional, used automatically if your device has one
+• "Draw over other apps" permission required only if you enable the floating elevation window

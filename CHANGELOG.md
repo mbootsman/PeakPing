@@ -7,6 +7,11 @@ All notable changes to PeakPing are documented in this file.
 ### Added
 - Development: Google Play releases can be uploaded with `./gradlew publishReleaseBundle` (Gradle Play Publisher, internal testing track)
 - Development: pushing a `v*` tag now builds, uploads to Google Play (internal track) and creates the GitHub release automatically via GitHub Actions
+- Store listing (descriptions, icon, feature graphic, screenshots) is now part of the repository, in the layout Google Play and F-Droid both read
+- Release APKs no longer contain Google's encrypted dependency-metadata block, and release builds work without signing credentials (as F-Droid requires)
+
+### Fixed
+- Store description: completed a truncated sentence about building from source, and updated the update-interval and privacy wording
 
 ---
 
