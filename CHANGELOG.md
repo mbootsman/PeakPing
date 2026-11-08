@@ -6,6 +6,7 @@ All notable changes to PeakPing are documented in this file.
 
 ### Added
 - Development: Google Play releases can be uploaded with `./gradlew publishReleaseBundle` (Gradle Play Publisher, internal testing track)
+- Development: pushing a `v*` tag now builds, uploads to Google Play (internal track) and creates the GitHub release automatically via GitHub Actions
 
 ---
 
