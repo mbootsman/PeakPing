@@ -12,6 +12,7 @@ lifecycleViewModelCompose = "2.8.7"
 accompanist = "0.36.0"
 coroutinesTest = "1.8.1"
 osmdroid = "6.1.20"
+playPublisher = "4.1.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -39,4 +40,5 @@ osmdroid = { group = "org.osmdroid", name = "osmdroid-android", version.ref = "o
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+play-publisher = { id = "com.github.triplet.play", version.ref = "playPublisher" }
 

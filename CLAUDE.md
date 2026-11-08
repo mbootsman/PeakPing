@@ -37,6 +37,7 @@ PeakPing is an Android app that displays real-time GPS elevation and accuracy da
 | `app/src/main/java/nl/marcel/peakping/Theme.kt`, `ui/theme/*.kt` | Compose theming (Dark / Light / System modes) |
 | `app/build.gradle.kts` | Dependencies and SDK config |
 | `app/src/main/AndroidManifest.xml` | Permissions, activity/service declarations |
+| `app/src/main/play/release-notes/en-US/default.txt` | Play Store "What's new" text uploaded with each release (max 500 chars) |
 
 ## Build & Run
 
@@ -45,7 +46,11 @@ PeakPing is an Android app that displays real-time GPS elevation and accuracy da
 ./gradlew installDebug           # Build and install on connected device
 ./gradlew test                   # Run unit tests
 ./gradlew lint                   # Run lint checks
+./gradlew bundleRelease          # Build signed release AAB
+./gradlew publishReleaseBundle   # Build + upload release AAB to Google Play (internal track)
 ```
+
+Google Play uploads use Gradle Play Publisher (`com.github.triplet.play`, 4.x for AGP 9), configured in the `play {}` block of `app/build.gradle.kts`. It uploads to the **internal** track; promote to production from Play Console. Credentials are a Play Console service-account JSON key, found via `playServiceAccountFile=` in the gitignored `keystore.properties` or the `ANDROID_PUBLISHER_CREDENTIALS` env var (for CI) — never commit the key. Before publishing: bump `versionCode`/`versionName` and update the release-notes file. Only the `*Release*` publish tasks apply; the debug variant (`.dev`) doesn't exist on Play. `playConfigs {}` isn't usable here (it needs the legacy `android {}` DSL type).
 
 Debug builds use `applicationIdSuffix = ".dev"` (package `nl.marcel.peakping.dev`, label "PeakPing Dev", version `x.y-dev`) so they install side-by-side with the Play Store version, which is signed with Google's Play App Signing key and can't be replaced by a locally signed APK. Debug-only overrides live in `app/src/debug/res/` (app name, tile/shortcut labels, and a copy of `xml/shortcuts.xml` whose `targetPackage` must stay in sync with the main one).
 

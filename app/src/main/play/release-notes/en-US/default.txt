@@ -1,0 +1,4 @@
+• No more Google Play Services: PeakPing now uses only standard Android location APIs
+• The update frequency setting now works: readings refresh at the interval you choose
+• The floating window shows the same smoothed elevation as the app, in sync
+• Place names are looked up less often, saving data

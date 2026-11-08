@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.play.publisher)
 }
 
 val keystorePropsFile: File = rootProject.file("keystore.properties")
@@ -61,6 +62,24 @@ configure<com.android.build.api.dsl.ApplicationExtension> {
         compose = true
     }
 }
+
+// ── Google Play publishing (Gradle Play Publisher) ───────────────────────────
+// Upload a release:  ./gradlew publishReleaseBundle
+// Credentials: a Google Play service-account JSON key, located via
+//   keystore.properties → playServiceAccountFile=/absolute/or/root-relative/path.json
+// or the ANDROID_PUBLISHER_CREDENTIALS environment variable (JSON contents, for CI).
+// Never commit the JSON key.
+// Release notes ("What's new"): app/src/main/play/release-notes/<locale>/default.txt
+play {
+    keystoreProps.getProperty("playServiceAccountFile")?.let {
+        serviceAccountCredentials.set(rootProject.file(it))
+    }
+    track.set("internal")              // promote to production from Play Console
+    defaultToAppBundles.set(true)      // Play requires AABs
+}
+
+// Only use the *Release* tasks: the debug build is "nl.marcel.peakping.dev", which doesn't
+// exist on Play, so publishDebug* would fail.
 
 // ── EGM96 geoid asset check ───────────────────────────────────────────────────
 // egm96_1deg.bin (127 KB) provides MSL altitude correction on Android < 14.
