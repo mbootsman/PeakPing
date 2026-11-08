@@ -55,6 +55,7 @@ fun SettingsScreen(
     onShowLabelsChange: (Boolean) -> Unit,
     updateInterval: UpdateInterval,
     onUpdateIntervalChange: (UpdateInterval) -> Unit,
+    hasBarometer: Boolean,
     floatingWindowEnabled: Boolean,
     onFloatingWindowToggle: (Boolean) -> Unit,
     colors: AppColors,
@@ -191,9 +192,9 @@ fun SettingsScreen(
             )
         }
 
-        // ── GPS UPDATE FREQUENCY section ──────────────────────────────────────
+        // ── UPDATE FREQUENCY section ──────────────────────────────────────────
         Text(
-            text = "GPS UPDATE FREQUENCY",
+            text = "UPDATE FREQUENCY",
             fontSize = 10.sp,
             fontFamily = FontFamily.SansSerif,
             fontWeight = FontWeight.Bold,
@@ -265,6 +266,19 @@ fun SettingsScreen(
                 )
             }
         }
+
+        val sources = buildList {
+            add("GPS")
+            add("Satellites")
+            if (hasBarometer) add("Barometer")
+        }
+        Text(
+            text = "Applies to: " + sources.joinToString(" · "),
+            fontSize = 12.sp,
+            fontFamily = FontFamily.SansSerif,
+            color = colors.dimText,
+            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp)
+        )
 
         // ── About ─────────────────────────────────────────────────────────────
         val context = LocalContext.current

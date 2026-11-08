@@ -529,6 +529,7 @@ fun ElevationScreen(viewModel: ElevationViewModel) {
             onShowLabelsChange = { viewModel.setShowLabels(it) },
             updateInterval = updateInterval,
             onUpdateIntervalChange = { viewModel.setUpdateInterval(it) },
+            hasBarometer = viewModel.hasBarometer,
             floatingWindowEnabled = floatingWindowEnabled,
             onFloatingWindowToggle = onFloatingWindowToggle,
             colors = colors,

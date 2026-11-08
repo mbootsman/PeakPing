@@ -234,8 +234,14 @@ class FloatingWindowService : Service() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED) return
         try {
+            val interval = runCatching {
+                UpdateInterval.valueOf(
+                    prefs.getString("update_interval", UpdateInterval.ONE_SEC.name)
+                        ?: UpdateInterval.ONE_SEC.name
+                )
+            }.getOrDefault(UpdateInterval.ONE_SEC)
             locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER, 1000L, 0f,
+                LocationManager.GPS_PROVIDER, interval.ms, 0f,
                 locationListener, Looper.getMainLooper()
             )
         } catch (_: Exception) {}

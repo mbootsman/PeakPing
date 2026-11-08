@@ -16,6 +16,7 @@ import android.location.LocationManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -153,15 +154,33 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
     // ── Geocoder ──────────────────────────────────────────────────────────────
 
     private val geocoder = Geocoder(application)
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /** Last time (elapsedRealtime) a reverse-geocode lookup was started; null = never. */
+    private var lastGeocodeMs: Long? = null
 
     private fun updateLocationName(lat: Double, lon: Double) {
+        // Place names change slowly — don't hit the geocoder on every GPS fix.
+        val now = SystemClock.elapsedRealtime()
+        val last = lastGeocodeMs
+        if (last != null && now - last < GEOCODE_INTERVAL_MS) return
+        lastGeocodeMs = now
+
         geocoder.getFromLocation(lat, lon, 1) { addresses ->
             val a = addresses.firstOrNull() ?: return@getFromLocation
             val name = listOfNotNull(a.locality, a.countryName).joinToString(", ")
             if (name.isNotEmpty()) {
-                _gpsState.value = _gpsState.value.copy(locationName = name)
+                // Callback runs on a binder thread; apply on main so it can't race
+                // with (and be overwritten by) GPS/baro state updates.
+                mainHandler.post {
+                    _gpsState.value = _gpsState.value.copy(locationName = name)
+                }
             }
         }
+    }
+
+    private companion object {
+        const val GEOCODE_INTERVAL_MS = 30_000L
     }
 
     // ── Location ──────────────────────────────────────────────────────────────
@@ -198,12 +217,19 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
             locked = true,
             baroFused = false,   // GPS just updated — baro will take over next sensor tick
         )
+        lastBaroEmitMs = SystemClock.elapsedRealtime()
 
         updateLocationName(location.latitude, location.longitude)
     }
 
+    /** Last time (elapsedRealtime) satellite count was published to the UI. */
+    private var lastSatEmitMs = 0L
+
     private val gnssCallback = object : GnssStatus.Callback() {
         override fun onSatelliteStatusChanged(status: GnssStatus) {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastSatEmitMs < _updateInterval.value.ms) return
+            lastSatEmitMs = now
             val usedCount = (0 until status.satelliteCount).count { status.usedInFix(it) }
             _gpsState.value = _gpsState.value.copy(satellites = usedCount)
         }
@@ -216,11 +242,21 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
     private val pressureSensor: Sensor? =
         sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
 
+    /** True if the device has a barometer (used to interpolate altitude between GPS fixes). */
+    val hasBarometer: Boolean get() = pressureSensor != null
+
     /** Raw baro altitude relative to standard atmosphere (1013.25 hPa). Null until first reading. */
     private var baroAltStd: Double? = null
 
     /** Offset = GPS MSL alt − standard baro alt; calibrated each GPS fix. Null until first GPS fix. */
     private var baroOffset: Double? = null
+
+    /**
+     * Last time (elapsedRealtime) a baro-derived reading was published to the UI.
+     * The sensor itself is sampled continuously (so calibration stays fresh), but
+     * UI updates are throttled to the user-selected update interval.
+     */
+    private var lastBaroEmitMs = 0L
 
     private val baroListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
@@ -229,6 +265,10 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
                 SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressureHpa
             ).toDouble()
             baroAltStd = rawAlt
+
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastBaroEmitMs < _updateInterval.value.ms) return
+            lastBaroEmitMs = now
 
             val offset = baroOffset
             val state  = _gpsState.value

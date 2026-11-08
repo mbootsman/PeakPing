@@ -9,7 +9,7 @@ PeakPing is an Android app that displays real-time GPS elevation and accuracy da
 - **Language**: Kotlin
 - **UI**: Jetpack Compose + Material3
 - **Architecture**: MVVM (ViewModel + StateFlow)
-- **Location**: Google Play Services Fused Location Provider
+- **Location**: Android `LocationManager` (`GPS_PROVIDER`, GPS hardware only — no Play Services dependency)
 - **Build**: Gradle with Kotlin DSL (Gradle 9.3.1)
 - **Min SDK**: 33 | **Compile SDK**: 36 | **Target SDK**: 36
 - **Current version**: 1.7 (versionCode 8)
@@ -48,13 +48,13 @@ PeakPing is an Android app that displays real-time GPS elevation and accuracy da
 
 ## Architecture Notes
 
-- GPS updates are requested at **1-second intervals** with **high accuracy** priority via `FusedLocationProviderClient`
+- GPS updates are requested from `LocationManager.GPS_PROVIDER` at the user-selected **update interval** (Settings > Update frequency: 1/2/5/10 s, `UpdateInterval` enum, persisted as `update_interval`); the barometer is sampled continuously but barometer- and satellite-driven UI updates are throttled to the same interval. `FloatingWindowService` reads the same preference when it starts
 - `ElevationViewModel` holds `GpsState` as a `StateFlow` collected by the Compose UI
 - Location permissions (`ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`) are handled at runtime using the Accompanist permissions library
 - Raw GPS altitude is WGS84 ellipsoidal; on Android 14+ (`UPSIDE_DOWN_CAKE`) native `Location.mslAltitudeMeters` is used when available, otherwise `GeoidModel` (EGM96, `egm96_1deg.bin`) converts ellipsoidal altitude to mean-sea-level height
 - A barometer (`Sensor.TYPE_PRESSURE`) is calibrated against each GPS-derived MSL altitude fix and used to interpolate altitude between fixes
 - `GnssStatus.Callback` tracks live satellite count (used-in-fix vs. total)
-- `Geocoder` performs reverse geocoding to show locality/country names
+- The Android system `Geocoder` performs reverse geocoding to show locality/country names, throttled to at most one lookup per 30 s (`GEOCODE_INTERVAL_MS`); results are posted to the main thread. No fallback is used — on devices without a geocoder backend (e.g. de-Googled ROMs) the place name simply stays blank
 - `FloatingWindowService` is a foreground service (`foregroundServiceType="location"`) that draws a draggable overlay via `SYSTEM_ALERT_WINDOW`; toggled from Settings > Display and requires the "draw over other apps" permission
 - The overlay can also be toggled without opening the app via a Quick Settings tile (`OverlayTileService`) or a static app shortcut (`OverlayShortcutActivity`, declared in `res/xml/shortcuts.xml`); both route start/stop/permission-request logic through `OverlayController` so there's one source of truth
 - `FloatingWindowService` is `foregroundServiceType="location"`, which Android only allows starting from a foreground/Activity caller — `OverlayTileService.onClick()` cannot start it directly and must launch `OverlayShortcutActivity` (via `startActivityAndCollapse`) to do so; stopping has no such restriction and is called directly from the tile
