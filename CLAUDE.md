@@ -20,7 +20,8 @@ PeakPing is an Android app that displays real-time GPS elevation and accuracy da
 |------|---------|
 | `app/src/main/java/nl/marcel/peakping/MainActivity.kt` | Entry point, permission handling, navigation between screens |
 | `app/src/main/java/nl/marcel/peakping/ElevationScreen.kt` | Main Compose UI — live elevation/accuracy display |
-| `app/src/main/java/nl/marcel/peakping/ElevationViewModel.kt` | GPS state management |
+| `app/src/main/java/nl/marcel/peakping/LocationRepository.kt` | Process-wide singleton owning GPS, GNSS satellites, barometer fusion, reverse geocoding and update-interval throttling; shared by the UI and the overlay |
+| `app/src/main/java/nl/marcel/peakping/ElevationViewModel.kt` | UI state: settings, saved pins, pulse; exposes `LocationRepository` state to Compose |
 | `app/src/main/java/nl/marcel/peakping/GpsState.kt` | Data class for GPS readings |
 | `app/src/main/java/nl/marcel/peakping/GeoidModel.kt` | EGM96 geoid undulation lookup — converts WGS84 ellipsoidal altitude to mean-sea-level height |
 | `app/src/main/java/nl/marcel/peakping/MapScreen.kt` | Map view of current position/track |
@@ -50,8 +51,8 @@ Debug builds use `applicationIdSuffix = ".dev"` (package `nl.marcel.peakping.dev
 
 ## Architecture Notes
 
-- GPS updates are requested from `LocationManager.GPS_PROVIDER` at the user-selected **update interval** (Settings > Update frequency: 1/2/5/10 s, `UpdateInterval` enum, persisted as `update_interval`); the barometer is sampled continuously but barometer- and satellite-driven UI updates are throttled to the same interval. `FloatingWindowService` reads the same preference when it starts
-- `ElevationViewModel` holds `GpsState` as a `StateFlow` collected by the Compose UI
+- GPS updates are requested from `LocationManager.GPS_PROVIDER` at the user-selected **update interval** (Settings > Update frequency: 1/2/5/10 s, `UpdateInterval` enum, persisted as `update_interval`); the barometer is sampled continuously but barometer- and satellite-driven UI updates are throttled to the same interval. Because the overlay reads the same `LocationRepository` state, interval changes apply to a running overlay immediately
+- `LocationRepository` is the single source of truth for live data: it holds `GpsState` as a `StateFlow`, collected by the Compose UI (via `ElevationViewModel`) and by `FloatingWindowService`, so both always show the same value. Sensors are reference-counted via `acquire()`/`release()` — they run while the main screen is resumed **or** the overlay is active, and stop when neither needs them
 - Location permissions (`ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`) are handled at runtime using the Accompanist permissions library
 - Raw GPS altitude is WGS84 ellipsoidal; on Android 14+ (`UPSIDE_DOWN_CAKE`) native `Location.mslAltitudeMeters` is used when available, otherwise `GeoidModel` (EGM96, `egm96_1deg.bin`) converts ellipsoidal altitude to mean-sea-level height
 - A barometer (`Sensor.TYPE_PRESSURE`) is calibrated against each GPS-derived MSL altitude fix and used to interpolate altitude between fixes

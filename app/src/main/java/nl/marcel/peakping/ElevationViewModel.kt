@@ -1,23 +1,7 @@
 package nl.marcel.peakping
 
-import android.Manifest
 import android.app.Application
 import android.content.Context
-import android.content.pm.PackageManager
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
-import android.location.Geocoder
-import android.location.GnssStatus
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
-import android.os.Build
-import android.os.Handler
-import android.os.Looper
-import android.os.SystemClock
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,17 +10,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-enum class UpdateInterval(val ms: Long, val label: String) {
-    ONE_SEC(1_000L, "1 second"),
-    TWO_SEC(2_000L, "2 seconds"),
-    FIVE_SEC(5_000L, "5 seconds"),
-    TEN_SEC(10_000L, "10 seconds"),
-}
-
 class ElevationViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val _gpsState = MutableStateFlow(GpsState.Empty)
-    val gpsState: StateFlow<GpsState> = _gpsState.asStateFlow()
+    init {
+        LocationRepository.init(application)
+    }
+
+    /** Live position/elevation, shared with the floating overlay via [LocationRepository]. */
+    val gpsState: StateFlow<GpsState> = LocationRepository.gpsState
 
     private val _pulseEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val pulseEvent: SharedFlow<Unit> = _pulseEvent.asSharedFlow()
@@ -82,18 +63,11 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
         _floatingWindowEnabled.value = FloatingWindowService.isRunning
     }
 
-    private val _updateInterval = MutableStateFlow(
-        UpdateInterval.valueOf(prefs.getString("update_interval", UpdateInterval.ONE_SEC.name) ?: UpdateInterval.ONE_SEC.name)
-    )
-    val updateInterval: StateFlow<UpdateInterval> = _updateInterval.asStateFlow()
+    val updateInterval: StateFlow<UpdateInterval> = LocationRepository.updateInterval
 
-    fun setUpdateInterval(interval: UpdateInterval) {
-        _updateInterval.value = interval
-        prefs.edit().putString("update_interval", interval.name).apply()
-        if (updatesStarted) {
-            restartLocationUpdates()
-        }
-    }
+    fun setUpdateInterval(interval: UpdateInterval) = LocationRepository.setUpdateInterval(interval)
+
+    val hasBarometer: Boolean get() = LocationRepository.hasBarometer
 
     // ── Saved pins ────────────────────────────────────────────────────────────
 
@@ -106,7 +80,7 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
     val saveEvent: SharedFlow<Unit> = _saveEvent.asSharedFlow()
 
     fun saveCurrentLocation(label: String) {
-        val state = _gpsState.value
+        val state = gpsState.value
         if (!state.locked) return
         val now = System.currentTimeMillis()
         val pin = SavedPin(
@@ -147,216 +121,18 @@ class ElevationViewModel(application: Application) : AndroidViewModel(applicatio
         return newPins.size
     }
 
-    init {
-        GeoidModel.init(application)
-    }
-
-    // ── Geocoder ──────────────────────────────────────────────────────────────
-
-    private val geocoder = Geocoder(application)
-    private val mainHandler = Handler(Looper.getMainLooper())
-
-    /** Last time (elapsedRealtime) a reverse-geocode lookup was started; null = never. */
-    private var lastGeocodeMs: Long? = null
-
-    private fun updateLocationName(lat: Double, lon: Double) {
-        // Place names change slowly — don't hit the geocoder on every GPS fix.
-        val now = SystemClock.elapsedRealtime()
-        val last = lastGeocodeMs
-        if (last != null && now - last < GEOCODE_INTERVAL_MS) return
-        lastGeocodeMs = now
-
-        geocoder.getFromLocation(lat, lon, 1) { addresses ->
-            val a = addresses.firstOrNull() ?: return@getFromLocation
-            val name = listOfNotNull(a.locality, a.countryName).joinToString(", ")
-            if (name.isNotEmpty()) {
-                // Callback runs on a binder thread; apply on main so it can't race
-                // with (and be overwritten by) GPS/baro state updates.
-                mainHandler.post {
-                    _gpsState.value = _gpsState.value.copy(locationName = name)
-                }
-            }
-        }
-    }
-
-    private companion object {
-        const val GEOCODE_INTERVAL_MS = 30_000L
-    }
-
-    // ── Location ──────────────────────────────────────────────────────────────
-
-    private val locationManager =
-        application.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-
-    // GPS_PROVIDER delivers fixes from GPS hardware only — no WiFi/cell blending
-    private val locationListener = LocationListener { location: Location ->
-        // API 34+: use the OS's built-in EGM96 MSL altitude.
-        // Older: subtract the EGM96 geoid undulation from the WGS84 ellipsoidal height.
-        if (!location.hasAltitude()) return@LocationListener
-
-        val altitude = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
-            location.hasMslAltitude()
-        ) {
-            location.mslAltitudeMeters
-        } else {
-            location.altitude - GeoidModel.undulation(location.latitude, location.longitude)
-        }
-
-        // Calibrate the baro offset every GPS fix so baro tracks MSL between fixes
-        val currentBaro = baroAltStd
-        if (currentBaro != null) {
-            baroOffset = altitude - currentBaro
-        }
-
-        _gpsState.value = _gpsState.value.copy(
-            elevation = altitude,
-            lat = location.latitude,
-            lon = location.longitude,
-            accuracyM = location.accuracy,
-            verticalAccuracyM = if (location.hasVerticalAccuracy()) location.verticalAccuracyMeters else 0f,
-            locked = true,
-            baroFused = false,   // GPS just updated — baro will take over next sensor tick
-        )
-        lastBaroEmitMs = SystemClock.elapsedRealtime()
-
-        updateLocationName(location.latitude, location.longitude)
-    }
-
-    /** Last time (elapsedRealtime) satellite count was published to the UI. */
-    private var lastSatEmitMs = 0L
-
-    private val gnssCallback = object : GnssStatus.Callback() {
-        override fun onSatelliteStatusChanged(status: GnssStatus) {
-            val now = SystemClock.elapsedRealtime()
-            if (now - lastSatEmitMs < _updateInterval.value.ms) return
-            lastSatEmitMs = now
-            val usedCount = (0 until status.satelliteCount).count { status.usedInFix(it) }
-            _gpsState.value = _gpsState.value.copy(satellites = usedCount)
-        }
-    }
-
-    // ── Barometer ─────────────────────────────────────────────────────────────
-
-    private val sensorManager =
-        application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-    private val pressureSensor: Sensor? =
-        sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
-
-    /** True if the device has a barometer (used to interpolate altitude between GPS fixes). */
-    val hasBarometer: Boolean get() = pressureSensor != null
-
-    /** Raw baro altitude relative to standard atmosphere (1013.25 hPa). Null until first reading. */
-    private var baroAltStd: Double? = null
-
-    /** Offset = GPS MSL alt − standard baro alt; calibrated each GPS fix. Null until first GPS fix. */
-    private var baroOffset: Double? = null
-
-    /**
-     * Last time (elapsedRealtime) a baro-derived reading was published to the UI.
-     * The sensor itself is sampled continuously (so calibration stays fresh), but
-     * UI updates are throttled to the user-selected update interval.
-     */
-    private var lastBaroEmitMs = 0L
-
-    private val baroListener = object : SensorEventListener {
-        override fun onSensorChanged(event: SensorEvent) {
-            val pressureHpa = event.values[0]
-            val rawAlt = SensorManager.getAltitude(
-                SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressureHpa
-            ).toDouble()
-            baroAltStd = rawAlt
-
-            val now = SystemClock.elapsedRealtime()
-            if (now - lastBaroEmitMs < _updateInterval.value.ms) return
-            lastBaroEmitMs = now
-
-            val offset = baroOffset
-            val state  = _gpsState.value
-            if (offset != null && state.locked) {
-                // GPS has calibrated us — use baro for smooth inter-fix altitude
-                _gpsState.value = state.copy(
-                    elevation  = rawAlt + offset,
-                    pressureHpa = pressureHpa,
-                    baroFused  = true,
-                )
-            } else {
-                // No GPS calibration yet — just surface the pressure reading
-                _gpsState.value = state.copy(pressureHpa = pressureHpa)
-            }
-        }
-
-        override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
-    }
-
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     private var updatesStarted = false
 
     fun startUpdates() {
         if (updatesStarted) return
-        val context = getApplication<Application>()
-        if (ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) return
-
-        try {
-            locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER,
-                _updateInterval.value.ms,
-                0f,
-                locationListener,
-                Looper.getMainLooper()
-            )
-            locationManager.registerGnssStatusCallback(
-                gnssCallback,
-                Handler(Looper.getMainLooper())
-            )
-        } catch (_: Exception) {
-            // GPS provider unavailable on this device
-        }
-
-        pressureSensor?.let {
-            sensorManager.registerListener(
-                baroListener,
-                it,
-                SensorManager.SENSOR_DELAY_UI,
-                Handler(Looper.getMainLooper())
-            )
-        }
-
-        updatesStarted = true
-    }
-
-    private fun restartLocationUpdates() {
-        val context = getApplication<Application>()
-        if (ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) return
-        try {
-            locationManager.removeUpdates(locationListener)
-            locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER,
-                _updateInterval.value.ms,
-                0f,
-                locationListener,
-                Looper.getMainLooper()
-            )
-        } catch (_: Exception) {}
+        updatesStarted = LocationRepository.acquire()
     }
 
     fun stopUpdates() {
         if (!updatesStarted) return
-        try {
-            locationManager.removeUpdates(locationListener)
-            locationManager.unregisterGnssStatusCallback(gnssCallback)
-        } catch (_: Exception) {}
-        try {
-            sensorManager.unregisterListener(baroListener)
-        } catch (_: Exception) {}
+        LocationRepository.release()
         updatesStarted = false
     }
 

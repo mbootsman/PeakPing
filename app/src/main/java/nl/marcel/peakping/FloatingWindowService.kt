@@ -1,23 +1,16 @@
 package nl.marcel.peakping
 
-import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
-import android.os.Build
 import android.os.IBinder
-import android.os.Looper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -25,7 +18,12 @@ import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
-import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlin.math.abs
 
 class FloatingWindowService : Service() {
@@ -38,29 +36,20 @@ class FloatingWindowService : Service() {
 
     private val prefs by lazy { getSharedPreferences("peakping_prefs", Context.MODE_PRIVATE) }
 
-    private val locationManager by lazy {
-        getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    }
+    /** Collects the shared [LocationRepository] state; cancelled in onDestroy. */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
-    private val locationListener = LocationListener { location: Location ->
-        if (!location.hasAltitude()) return@LocationListener
-        val altitudeM = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
-            location.hasMslAltitude()
-        ) {
-            location.mslAltitudeMeters
-        } else {
-            location.altitude - GeoidModel.undulation(location.latitude, location.longitude)
-        }
+    /** True while this service holds a [LocationRepository] reference. */
+    private var holdsLocation = false
+
+    private fun render(state: GpsState) {
+        if (!state.locked) return  // keep "--" until the first fix
         val unit = UnitSystem.valueOf(
             prefs.getString("unit_system", UnitSystem.METRIC.name) ?: UnitSystem.METRIC.name
         )
-        val value = if (unit == UnitSystem.METRIC) altitudeM.toInt().toString()
-                    else (altitudeM * 3.28084).toInt().toString()
-        val label = if (unit == UnitSystem.METRIC) " m" else " ft"
-        elevationText.post {
-            elevationText.text = value
-            unitText.text = label
-        }
+        elevationText.text = if (unit == UnitSystem.METRIC) state.elevation.toInt().toString()
+                             else (state.elevation * 3.28084).toInt().toString()
+        unitText.text = if (unit == UnitSystem.METRIC) " m" else " ft"
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -76,17 +65,24 @@ class FloatingWindowService : Service() {
     override fun onCreate() {
         super.onCreate()
         isRunning = true
-        GeoidModel.init(this)
+        LocationRepository.init(this)
         startForegroundNotification()
         createOverlayView()
-        startGps()
+        // Same source (GPS + baro fusion, interval throttling) as the main screen,
+        // so the overlay always shows the same value at the same moment.
+        holdsLocation = LocationRepository.acquire()
+        LocationRepository.gpsState.onEach(::render).launchIn(scope)
     }
 
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
         overlayView?.let { windowManager.removeView(it) }
-        try { locationManager.removeUpdates(locationListener) } catch (_: Exception) {}
+        scope.cancel()
+        if (holdsLocation) {
+            LocationRepository.release()
+            holdsLocation = false
+        }
     }
 
     private fun startForegroundNotification() {
@@ -228,23 +224,6 @@ class FloatingWindowService : Service() {
                 else -> false
             }
         }
-    }
-
-    private fun startGps() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-            != PackageManager.PERMISSION_GRANTED) return
-        try {
-            val interval = runCatching {
-                UpdateInterval.valueOf(
-                    prefs.getString("update_interval", UpdateInterval.ONE_SEC.name)
-                        ?: UpdateInterval.ONE_SEC.name
-                )
-            }.getOrDefault(UpdateInterval.ONE_SEC)
-            locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER, interval.ms, 0f,
-                locationListener, Looper.getMainLooper()
-            )
-        } catch (_: Exception) {}
     }
 
     companion object {
