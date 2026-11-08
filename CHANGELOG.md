@@ -2,6 +2,22 @@
 
 All notable changes to PeakPing are documented in this file.
 
+## [Unreleased]
+
+### Changed
+- Settings: "GPS update frequency" renamed to "Update frequency", with a caption listing what it applies to on this device (GPS, Satellites, and Barometer when the phone has one)
+- The floating elevation window now follows the selected update frequency instead of always updating every second (takes effect the next time the overlay is started)
+- Place names (reverse geocoding) are now looked up at most once every 30 seconds instead of on every GPS fix, reducing network use
+
+### Fixed
+- The update frequency slider had no visible effect: barometer and satellite readings kept refreshing the screen many times per second. On-screen updates now follow the selected interval (the barometer is still sampled continuously in the background to stay calibrated)
+- Place name could occasionally be overwritten and disappear when a lookup finished at the same moment as a GPS update
+
+### Removed
+- Google Play Services: the unused Play Services Location library has been removed. PeakPing now contains no Google Play Services code and relies only on standard Android location APIs (`LocationManager`). On phones without Google services the app works fully, though place names depend on the phone's geocoder and may not appear
+
+---
+
 ## [1.7] — 2026-09-14
 
 ### Added
