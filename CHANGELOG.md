@@ -2,7 +2,7 @@
 
 All notable changes to PeakPing are documented in this file.
 
-## [Unreleased]
+## [1.8.1] — 2026-11-09
 
 ### Added
 - Development: Google Play releases can be uploaded with `./gradlew publishReleaseBundle` (Gradle Play Publisher, internal testing track)
