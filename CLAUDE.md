@@ -57,17 +57,19 @@ Google Play uploads use Gradle Play Publisher (`com.github.triplet.play`, 4.x fo
 
 ### F-Droid
 
-The app is prepared for F-Droid (recipe draft kept outside the repo, for the `fdroiddata` repository). Constraints to keep:
+The app is submitted to F-Droid (recipe `metadata/nl.marcel.peakping.yml` in the `fdroiddata` repo, MR https://gitlab.com/fdroid/fdroiddata/-/merge_requests/56520). Constraints to keep:
 - No proprietary dependencies (no Play Services, Firebase, Crashlytics, etc.)
 - `dependenciesInfo { includeInApk = false }` — F-Droid rejects the Google-encrypted dependency block in APKs
-- The release `signingConfig` is only applied when `keystore.properties` exists, so F-Droid's server can build an unsigned APK and sign it itself
+- The release `signingConfig` is only applied when `keystore.properties` exists, so F-Droid's server can build an unsigned APK to compare with ours
 - F-Droid builds from version tags (`UpdateCheckMode: Tags`), so every release must be tagged `vX.Y.Z`
+- **Reproducible builds** are enabled: the recipe has `Binaries: https://github.com/mbootsman/PeakPing/releases/download/v%v/PeakPing-%v.apk` and `AllowedAPKSigningKeys` (the upload key). F-Droid rebuilds each tag, checks the result is identical to the GitHub release APK and then ships that APK with our signature. So `versionName` must always be three-part `X.Y.Z` and the tag exactly `v<versionName>`, the GitHub release must contain `PeakPing-<versionName>.apk`, and the release APK must stay byte-for-byte reproducible (no build timestamps, machine-specific paths, or other non-deterministic output)
+- The recipe's `prebuild` strips the foojay toolchain-resolver plugin from `settings.gradle.kts` and deletes `gradle/gradle-daemon-jvm.properties` (F-Droid's scanner rejects them), and `egm96_1deg.bin` is `scanignore`d
 
 ### Releasing (CI)
 
-`.github/workflows/release.yml` runs on any pushed `v*` tag. It fails unless the tag is `v<versionName>` or `v<versionName>.0` and `CHANGELOG.md` has a `## [<versionName>]` section. It builds the signed APK + AAB, uploads the AAB to Play's internal track, and creates the GitHub release with `PeakPing-<versionName>.apk` and that CHANGELOG section as notes. Signing and Play credentials come from repository secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`.
+`.github/workflows/release.yml` runs on any pushed `v*` tag. It fails unless `versionName` is three-part `X.Y.Z`, the tag is exactly `v<versionName>`, and `CHANGELOG.md` has a `## [<versionName>]` section. It builds the signed APK + AAB, uploads the AAB to Play's internal track, and creates the GitHub release with `PeakPing-<versionName>.apk` and that CHANGELOG section as notes. Signing and Play credentials come from repository secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`.
 
-Release steps: bump `versionCode`/`versionName` → rename `[Unreleased]` in `CHANGELOG.md` to `[x.y] — date` → update the Play release-notes file → commit + push → `git tag -a vX.Y.0 -m "PeakPing X.Y" && git push origin vX.Y.0` → promote from internal to production in Play Console.
+Release steps: bump `versionCode`/`versionName` → rename `[Unreleased]` in `CHANGELOG.md` to `[X.Y.Z] — date` → update the Play release-notes file → commit + push → `git tag -a vX.Y.Z -m "PeakPing X.Y.Z" && git push origin vX.Y.Z` → promote from internal to production in Play Console.
 
 ## Architecture Notes
 

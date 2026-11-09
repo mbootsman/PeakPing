@@ -2,6 +2,13 @@
 
 All notable changes to PeakPing are documented in this file.
 
+## [Unreleased]
+
+### Changed
+- Development: release tags must now be exactly `v<versionName>` with a three-part version (e.g. `v1.9.0`), so F-Droid can find the matching GitHub APK for reproducible builds
+
+---
+
 ## [1.8.1] — 2026-11-09
 
 ### Added
